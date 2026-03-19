@@ -1,0 +1,152 @@
+# 公共配置，所有环境共用。环境差异在 application-{profile}.yml
+spring:
+  application:
+    name: xinmiao
+  jackson:
+    default-property-inclusion: non_null
+  main:
+    banner-mode: off
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  rabbitmq:
+    # 发布可靠性：开启 publisher confirm/return，确保发布端可感知是否到达 broker/是否路由成功
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000
+          multiplier: 2.0
+  data:
+    redis:
+      lettuce:
+        pool:
+          max-active: 32
+          max-idle: 16
+          min-idle: 4
+          time-between-eviction-runs: 10s
+  ai:
+    # Spring AI 调用下游的通用重试策略（适用于大模型 / 向量库 HTTP 调用）。
+    # - 仅对指定 HTTP 状态码重试，避免对 4xx（如参数错误/鉴权失败）无意义重试。
+    retry:
+      max-attempts: 5
+      on-client-errors: false
+      on-http-codes: [429, 500, 502, 503]
+      backoff:
+        initial-interval: 1s
+        multiplier: 2
+        max-interval: 30s
+    openai:
+      # 使用 OpenAI-compatible 协议接入模型服务（这里指向硅基流动网关）。
+      base-url: https://api.siliconflow.cn/
+      api-key: ${SPRING_AI_OPENAI_API_KEY:}
+      chat:
+        options:
+          # 对话模型（DeepSeek-V3）
+          model: deepseek-ai/DeepSeek-V3
+      embedding:
+        options:
+          # 向量化模型（Embedding）
+          model: Qwen/Qwen3-Embedding-4B
+    vectorstore:
+      chroma:
+        # Chroma 向量库的 collection 与初始化策略
+        collection-name: rag-demo
+        initialize-schema: true
+        tenant-name: SpringAiTenant
+        database-name: SpringAiDatabase
+  mvc:
+    async:
+      request-timeout: 120000 # 120 秒（兜底超时）
+
+app:
+  # 缓存回源限流：Redis 不可用时限制同时回源 DB 的并发数，超出则 503，保障数据库存活
+  cache:
+    fallback:
+      max-concurrent: 20
+      # 回源许可等待超时（毫秒）：超过该时间仍拿不到 permit，则快速失败返回 503（SERVICE_BUSY）
+      acquire-timeout-millis: 2000
+  chat:
+    # RAG 检索专用线程池（阻塞操作隔离）
+    rag:
+      core-pool-size: 20
+      max-pool-size: 100
+      queue-capacity: 1000
+
+      # RAG 检索的“响应式超时”（RagService.retrieveDocumentsAsync 使用）。
+      # 超时/异常会降级为无 RAG：只返回空文档列表，让大模型直接回答。
+      timeout-seconds: 15
+
+      # 向量检索参数：可线上调参（不改代码）
+      # - retrieval-timeout-seconds：向量库 HTTP 客户端的读取超时（用于 ChromaApi 的 RestClient）
+      retrieval-timeout-seconds: 10
+      top-k: 6
+      similarity-threshold: 0.3
+    # SSE 发送专用线程池（阻塞 IO 隔离）
+    sse:
+      core-pool-size: 50
+      max-pool-size: 300
+      queue-capacity: 3000
+    stream:
+      # LLM 流式/非流式对话的最大并发（本机实例内，由 Semaphore 控制）。
+      max-concurrent: 30
+    rate-limit:
+      # 对话接口按用户滑动窗口限流（Redis ZSET + Lua），用于防慢速攻击与突发流量保护。
+      enabled: true
+      per-user-per-minute: 10  # 降低为 10，作为 Semaphore 的补充（防慢速攻击 + 未来分布式扩展）
+      window-seconds: 60
+    timeout:
+      # LLM 侧流式响应超时（Reactor timeout）；超时会中断本次对话，避免连接长期占用。
+      seconds: 150
+    memory:
+      # 对话记忆（RedisChatMemoryRepository）：
+      # - ttl-hours：会话过期自动清理
+      # - max-messages-per-conversation：单会话最多保留的消息条数（超出裁剪为最近 N 条）
+      ttl-hours: 168
+      max-messages-per-conversation: 50
+
+  # WebSocket 传输层保护（慢客户端断开策略）
+  # - send-time-limit-ms：单次发送允许占用的最长时间，超出则认为客户端过慢并断开连接
+  # - send-buffer-size-limit-bytes：每个连接允许积压的待发送缓冲上限，超出将触发断开/背压
+  # - message-size-limit-bytes：单条消息大小上限，防止大包占用发送缓冲
+  ws:
+    # STOMP 心跳（断线检测/清理僵尸连接）
+    # - server-ms：服务端向客户端发送心跳的间隔
+    # - client-ms：期望客户端向服务端发送心跳的间隔
+    heartbeat:
+      server-ms: 15000
+      client-ms: 15000
+    transport:
+      send-time-limit-ms: 10000
+      send-buffer-size-limit-bytes: 1048576
+      message-size-limit-bytes: 65536
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: assign_id
+      table-prefix: tb_
+    banner: false
+  type-aliases-package: com.tree.entity
+
+aliyun:
+  oss:
+    endpoint: https://oss-cn-beijing.aliyuncs.com
+    bucketName: test-for-tree
+    region: cn-beijing
+    allowed-content-types: image/jpeg,image/png,image/gif,image/webp
+    max-file-size: 5242880
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+  api-docs:
+    path: /v3/api-docs
+    enabled: true

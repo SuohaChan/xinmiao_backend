@@ -1,0 +1,42 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  chroma:
+    image: chromadb/chroma:1.0.0
+    container_name: chroma-db-spring-ai
+    restart: unless-stopped
+    ports:
+      - "8000:8000" # Chroma HTTP API (Spring AI)
+    volumes:
+      - chroma_data:/chroma/.chroma
+    command: ["run", "--host", "0.0.0.0", "--port", "8000"]
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: xinmiao-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+volumes:
+  rabbitmq_data:
+  chroma_data:
+  es_data:
+

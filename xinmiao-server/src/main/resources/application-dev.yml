@@ -1,0 +1,47 @@
+# 开发环境配置。默认 profile=dev，本地不配置环境变量即可运行
+server:
+  port: 9090
+
+jwt:
+  secret: ${JWT_SECRET:xinmiao-jwt-secret-key-at-least-32-bytes-long-for-hs256}
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:8000,http://127.0.0.1:5500,http://localhost:80,http://47.117.80.173,http://127.0.0.1:5501}
+
+app:
+  log:
+    aop:
+      enabled: true
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/xinmiao?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:admin}
+    password: ${RABBITMQ_PASSWORD:admin123}
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  ai:
+    vectorstore:
+      chroma:
+        client:
+          host: http://localhost
+          port: 8000
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+logging:
+  level:
+    root: INFO
+    com.tree: DEBUG
+    org.springdoc: DEBUG

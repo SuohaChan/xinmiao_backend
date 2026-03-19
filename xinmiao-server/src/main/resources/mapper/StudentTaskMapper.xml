@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tree.mapper.StudentTaskMapper">
+
+    <!-- 批量插入学生任务关联记录 -->
+    <insert id="batchInsert">
+        INSERT INTO tb_student_task (
+        student_id,
+        task_id,
+        status,
+        create_time,
+        update_time
+        ) VALUES
+        <foreach collection="list" item="item" separator=",">
+            (
+            #{item.studentId},
+            #{item.taskId},
+            #{item.status},
+            #{item.createTime},
+            #{item.updateTime}
+            )
+        </foreach>
+    </insert>
+
+    <!-- 查询学生的未完成任务 -->
+    <select id="selectUnfinishedTasks" resultType="com.tree.entity.Task">
+        SELECT t.* FROM tb_task t
+        WHERE t.is_published = 1  -- 只查已发布任务
+          AND t.id NOT IN (
+            -- 排除该学生已完成的任务
+            SELECT task_id FROM tb_student_task
+            WHERE student_id = #{studentId}
+              AND status = 1  -- status=1表示已完成
+        )
+          -- 任务可见范围：校级/本院级/本班级（按 ID）
+          AND (
+            t.level = '校级'
+                OR (t.level = '院级' AND t.college_id = #{collegeId})
+                OR (t.level = '班级' AND t.class_id = #{classId})
+            )
+        ORDER BY t.create_time DESC
+    </select>
+
+    <!-- 周排行榜（本周榜：本周一 0 点～当前） -->
+    <select id="getWeekRank" resultType="com.tree.dto.RankDto">
+        SELECT
+            sc.student_id,
+            s.nickname AS student_nickname,
+            sc.college,
+            sc.clazz,
+            SUM(t.score) AS total_score,
+            RANK() OVER (ORDER BY SUM(t.score) DESC) AS `rank`
+        FROM
+            tb_student_task st
+                JOIN
+            tb_task t ON st.task_id = t.id
+                JOIN
+            tb_student s ON st.student_id = s.id
+                JOIN
+            tb_student_class sc ON st.student_id = sc.student_id
+        WHERE
+            st.status = 1
+          AND st.submit_time >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)
+        GROUP BY
+            sc.student_id, s.nickname, sc.college, sc.clazz
+        ORDER BY
+            total_score DESC
+        LIMIT 10
+    </select>
+
+    <select id="getCollegeRank" resultType="com.tree.dto.RankDto">
+        SELECT
+            sc.student_id,
+            s.nickname AS student_nickname,
+            sc.college,
+            sc.clazz,
+            SUM(t.score) AS total_score,
+            RANK() OVER (ORDER BY SUM(t.score) DESC) AS `rank`
+        FROM
+            tb_student_task st
+                JOIN
+            tb_task t ON st.task_id = t.id
+                JOIN
+            tb_student s ON st.student_id = s.id
+                JOIN
+            tb_student_class sc ON st.student_id = sc.student_id
+        WHERE
+            st.status = 1
+          AND sc.college = #{college}
+        GROUP BY
+            sc.student_id, s.nickname, sc.college, sc.clazz
+        ORDER BY
+            total_score DESC
+        LIMIT 20
+    </select>
+
+    <!-- 学院学年榜：按学年时间范围（submit_time）汇总积分，从 DB 算后写 Redis -->
+    <select id="getCollegeRankByAcademicYear" resultType="com.tree.dto.RankDto">
+        SELECT
+            sc.student_id,
+            s.nickname AS student_nickname,
+            sc.college,
+            sc.clazz,
+            SUM(t.score) AS total_score,
+            RANK() OVER (ORDER BY SUM(t.score) DESC) AS `rank`
+        FROM
+            tb_student_task st
+                JOIN tb_task t ON st.task_id = t.id
+                JOIN tb_student s ON st.student_id = s.id
+                JOIN tb_student_class sc ON st.student_id = sc.student_id
+        WHERE
+            st.status = 1
+          AND sc.college = #{college}
+          AND st.submit_time &gt;= #{startTime}
+          AND st.submit_time &lt;= #{endTime}
+        GROUP BY
+            sc.student_id, s.nickname, sc.college, sc.clazz
+        ORDER BY
+            total_score DESC
+        LIMIT 200
+    </select>
+
+    <!-- 批量查询学生对一批任务的完成状态，避免 N+1 -->
+    <select id="selectTaskStatusBatch" resultType="com.tree.dto.TaskStatusItem">
+        SELECT task_id AS taskId, status
+        FROM tb_student_task
+        WHERE student_id = #{studentId}
+        <if test="taskIds != null and !taskIds.isEmpty()">
+            AND task_id IN
+            <foreach collection="taskIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        </if>
+    </select>
+
+    <!-- 批量查询多任务下各班级完成情况（校级/院级/班级范围在 SQL 内过滤），避免 1+2N -->
+    <select id="selectClassStatsByTaskIds" resultType="com.tree.dto.ClassTaskStatsDto">
+        SELECT
+            t.id AS taskId,
+            t.title AS taskTitle,
+            sc.college,
+            sc.clazz,
+            COUNT(*) AS totalStudents,
+            SUM(CASE WHEN st.status = 1 THEN 1 ELSE 0 END) AS completedStudents
+        FROM tb_task t
+        INNER JOIN tb_student_task st ON st.task_id = t.id
+        INNER JOIN tb_student_class sc ON st.student_id = sc.student_id
+        <if test="taskIds != null and !taskIds.isEmpty()">
+            WHERE t.id IN
+            <foreach collection="taskIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+            AND (
+                t.level = '校级'
+                OR (t.level = '院级' AND sc.college_id = t.college_id)
+                OR (t.level = '班级' AND sc.class_id = t.class_id)
+            )
+        </if>
+        GROUP BY t.id, t.title, sc.college, sc.clazz
+    </select>
+
+</mapper>

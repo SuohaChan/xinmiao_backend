@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tree.mapper.CreditFlowMapper">
+
+    <!-- 按时间范围聚合流水，供今日榜/周榜缺 key 时懒加载 -->
+    <select id="aggregateByTimeRange" resultType="com.tree.dto.RankDto">
+        SELECT
+            student_id AS studentId,
+            SUM(credit) AS totalScore
+        FROM tb_credit_flow
+        WHERE occurred_at &gt;= #{startTime}
+          AND occurred_at &lt;= #{endTime}
+        GROUP BY student_id
+        ORDER BY totalScore DESC
+        LIMIT #{limit}
+    </select>
+</mapper>

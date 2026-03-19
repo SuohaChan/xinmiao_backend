@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <!-- 继承最顶层父工程，复用统一的依赖版本和插件配置 -->
+        <groupId>com.tree</groupId>
+        <artifactId>xinmiao</artifactId>
+        <version>0.0.1-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <!-- 纯数据结构模块：entity / dto / vo / enum 等 -->
+    <artifactId>xinmiao-pojo</artifactId>
+    <name>xinmiao-pojo</name>
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <!-- Lombok 注解支持（常用于 DTO / VO / 实体） -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- MyBatis-Plus 注解（如 TableName、TableId、TableField 等），仅用于实体映射配置 -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-annotation</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+
+        <!-- Jackson 注解（如 @JsonFormat、@JsonProperty 等） -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
+
+        <!-- Bean Validation API（@NotBlank、@Size 等），与 Controller @Valid 配合 -->
+        <dependency>
+            <groupId>jakarta.validation</groupId>
+            <artifactId>jakarta.validation-api</artifactId>
+        </dependency>
+    </dependencies>
+</project>

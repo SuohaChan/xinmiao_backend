@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <!-- 当前 POM 作为整个项目的“父工程”，只做版本管理 + 多模块聚合，不直接产出可运行 Jar -->
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 继承 Spring Boot 官方父 POM，统一管理 Spring 生态依赖版本 -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.3</version>
+        <relativePath/>
+    </parent>
+
+    <!-- 项目坐标配置：父工程坐标，子模块通过 <parent> 继承 -->
+    <groupId>com.tree</groupId>
+    <artifactId>xinmiao</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>xinmiao</name>
+    <description>xinmiao 多模块父工程（仅做依赖版本和模块管理）</description>
+    <!-- 关键：父工程打包方式为 pom，不生成业务 Jar -->
+    <packaging>pom</packaging>
+
+    <!-- Spring AI 1.0.0 所需的里程碑仓库配置 -->
+    <repositories>
+        <repository>
+            <id>spring-milestones</id>
+            <name>Spring Milestones</name>
+            <url>https://repo.spring.io/milestone</url>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
+    <!-- 全局版本属性：统一管理各类三方依赖版本，子模块直接引用这些属性 -->
+    <properties>
+        <!-- 构建编码：统一为 UTF-8，避免 YAML 等资源在 target 中乱码 -->
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <!-- Java 版本 -->
+        <java.version>17</java.version>
+
+        <!-- 数据库相关版本 -->
+        <druid.version>1.2.22</druid.version>                 <!-- Druid 连接池 -->
+        <mybatis-plus.version>3.5.6</mybatis-plus.version>    <!-- MyBatis-Plus -->
+
+        <!-- 工具类版本 -->
+        <okhttp3.version>4.12.0</okhttp3.version>             <!-- OkHttp：HTTP 客户端工具 -->
+        <hutool.version>5.8.28</hutool.version>               <!-- Hutool：Java 工具类库 -->
+
+        <!-- 阿里云 OSS 版本 -->
+        <aliyun-oss.version>3.18.0</aliyun-oss.version>       <!-- 阿里云 OSS SDK -->
+
+        <!-- Jakarta 依赖版本 -->
+        <jakarta.xml.bind-api.version>4.0.2</jakarta.xml.bind-api.version>
+        <jaxb-runtime.version>4.0.5</jaxb-runtime.version>
+
+        <!-- Spring AI 版本 -->
+        <spring-ai.version>1.0.0</spring-ai.version>          <!-- Spring AI：Ollama / OpenAI 支持 -->
+
+        <!-- OpenAPI 文档版本 -->
+        <springdoc.version>2.7.0</springdoc.version>          <!-- SpringDoc：OpenAPI 3.x 接口文档 -->
+    </properties>
+
+    <!-- 多模块聚合：这里只声明模块列表，具体依赖由各子模块自行声明/继承 -->
+    <modules>
+        <!-- 通用工具、Result、异常、工具类 等 -->
+        <module>xinmiao-common</module>
+        <!-- entity / dto / vo / enum 等纯数据结构 -->
+        <module>xinmiao-pojo</module>
+        <!-- 唯一后端服务模块：Web + 业务逻辑 + AI -->
+        <module>xinmiao-server</module>
+    </modules>
+
+    <!-- 构建插件：在父工程统一声明，子模块自动继承 -->
+    <build>
+        <!-- 这里只做插件“管理”，真正启用 Spring Boot 打包的模块在各自子模块中单独声明 -->
+        <pluginManagement>
+            <plugins>
+                <!-- Spring Boot 打包插件默认配置 -->
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <configuration>
+                        <!-- Lombok 仅参与编译，不打入最终构件 -->
+                        <excludes>
+                            <exclude>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                            </exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>
