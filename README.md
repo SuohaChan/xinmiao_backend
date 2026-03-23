@@ -6,7 +6,7 @@
 
 - **JDK 17** · **Spring Boot 3.5.3** · **MyBatis-Plus 3.5.6** · **MySQL**
 - **Project Reactor** · **WebSocket** · **JWT** · **Spring AI 1.0.0**
-- **Redis** · **Redisson** · **RabbitMQ** · **Chroma 向量库** · **Elasticsearch 8.15**
+- **Redis**  · **RabbitMQ** · **Chroma 向量库** · 
 - **Druid** · **SpringDoc OpenAPI 3** · **阿里云 OSS** · **Docker Compose**
 
 ## 核心特性
@@ -18,7 +18,7 @@
 按场景拆分 **RAG 检索线程池** (20/100)、**SSE 发送线程池** (50/300)；Semaphore 限流 (30 并发) 防止 LLM 调用压垮下游；**Redis ZSET + Lua 脚本** 滑动窗口限流 (单用户 10 次/分钟)；信号量控制缓存回源 DB 并发数 (20)，超出返回 503。
 
 ### 分布式缓存与一致性保障
-**Cache Aside + Redisson 分布式锁** 解决缓存击穿；数据库 **CAS 乐观更新** 保证任务提交幂等；**Redis Set 防重** 减轻 DB 压力；**Lua 脚本原子操作** 实时更新排行榜；定时任务重建榜单兜底最终一致性。
+**Cache Aside + Redis 分布式锁** 解决缓存击穿；数据库 **CAS 乐观更新** 保证任务提交幂等；**Redis Set 防重** 减轻 DB 压力；**Lua 脚本原子操作** 实时更新排行榜；定时任务重建榜单兜底最终一致性。
 
 ### 实时消息推送
 基于 **Spring WebSocket + STOMP** 实现通知/聊天实时推送，心跳检测清理僵尸连接；**RabbitMQ** 开启 Publisher Confirm/Return，消费失败重试 (3 次) + 死信队列 (DLQ)；配置发送超时 (10s)、缓冲上限 (1MB) 断开慢客户端。
