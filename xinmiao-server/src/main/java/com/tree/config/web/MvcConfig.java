@@ -57,6 +57,7 @@ public class MvcConfig extends WebMvcConfigurationSupport {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         String[] origins = corsAllowedOrigins.split("\\s*,\\s*");
+        log.info("[CORS 配置] 允许的源：{}", String.join(", ", origins));
         registry.addMapping("/**")
                 .allowedOrigins(origins)
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")

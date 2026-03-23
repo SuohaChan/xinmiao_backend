@@ -20,6 +20,8 @@ import com.tree.entity.StudentTask;
 import com.tree.entity.Task;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -114,7 +116,16 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
         registerDto.setPassword(encodedPassword);
 
         Student student = BeanUtil.copyProperties(registerDto, Student.class, "id");
-        save(student);
+        try {
+            save(student);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException(ErrorCode.DUPLICATE, "用户名已存在，请更换用户名");
+        } catch (DataIntegrityViolationException e) {
+            if (isUniqueUsernameViolation(e)) {
+                throw new BusinessException(ErrorCode.DUPLICATE, "用户名已存在，请更换用户名");
+            }
+            throw e;
+        }
 
         //学生班级信息关联（学院/班级名称与 tb_college/tb_class 的 id 保持一致）
         StudentClass studentClass = new StudentClass();
@@ -284,7 +295,29 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
 
     @Override
     public void updateStudent(Student student) {
-        updateById(student);
+        try {
+            updateById(student);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException(ErrorCode.DUPLICATE, "用户名已存在，请更换用户名");
+        } catch (DataIntegrityViolationException e) {
+            if (isUniqueUsernameViolation(e)) {
+                throw new BusinessException(ErrorCode.DUPLICATE, "用户名已存在，请更换用户名");
+            }
+            throw e;
+        }
+    }
+
+    /** 识别 tb_student.uk_student_username 冲突（MySQL 1062 等） */
+    private static boolean isUniqueUsernameViolation(DataIntegrityViolationException e) {
+        for (Throwable c = e; c != null; c = c.getCause()) {
+            if (c instanceof java.sql.SQLIntegrityConstraintViolationException ex) {
+                String m = ex.getMessage();
+                if (m != null && m.contains("uk_student_username")) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Override

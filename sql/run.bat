@@ -19,5 +19,6 @@ mysql -u %MYSQL_USER% -h %MYSQL_HOST% -P %MYSQL_PORT% < studentCourse.sql
 mysql -u %MYSQL_USER% -h %MYSQL_HOST% -P %MYSQL_PORT% < task.sql
 mysql -u %MYSQL_USER% -h %MYSQL_HOST% -P %MYSQL_PORT% < appeal.sql
 mysql -u %MYSQL_USER% -h %MYSQL_HOST% -P %MYSQL_PORT% < credit_flow.sql
+mysql -u %MYSQL_USER% -h %MYSQL_HOST% -P %MYSQL_PORT% < tb_student_username_unique.sql
 echo 数据库初始化完成！
 pause

@@ -251,11 +251,11 @@ public class AiChatService {
                                     CACHE_AI_REPLY_TTL_MINUTES, TimeUnit.MINUTES);
                             log.debug("[AI] 缓存写入 | requestId={}", requestId);
                         }
-                    })
-                    .doFinally(signal -> {
-                        log.debug("[AI] 资源释放 | userId={} | signal={}", userId, signal);
-                        conversationSemaphore.release();
                     });
+        }).doFinally(signal -> {
+            // 整条链（RAG Mono + LLM Flux）结束即释放，避免 RAG 失败时内层未订阅导致漏 release
+            log.debug("[AI] 对话并发许可释放 | userId={} | signal={}", userId, signal);
+            conversationSemaphore.release();
         });
     }
 
