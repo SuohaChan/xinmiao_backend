@@ -35,6 +35,15 @@ services:
     volumes:
       - es_data:/usr/share/elasticsearch/data
 
+  # 分布式追踪 UI + 收集器；应用配置 management.zipkin.tracing.endpoint: http://localhost:9411/api/v2/spans
+  # 若后端也跑在同一 compose 网络内，endpoint 可改为 http://zipkin:9411/api/v2/spans
+  zipkin:
+    image: openzipkin/zipkin:3.4
+    container_name: zipkin
+    restart: unless-stopped
+    ports:
+      - "9411:9411"
+
 volumes:
   rabbitmq_data:
   chroma_data:

@@ -5,7 +5,7 @@
     <!-- 控制台输出（被异步包装） -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>${CONSOLE_LOG_PATTERN:-%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n}</pattern>
+            <pattern>${CONSOLE_LOG_PATTERN:-%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] trace=%X{traceId:-} span=%X{spanId:-} %-5level %logger{36} - %msg%n}</pattern>
             <charset>UTF-8</charset>
         </encoder>
     </appender>

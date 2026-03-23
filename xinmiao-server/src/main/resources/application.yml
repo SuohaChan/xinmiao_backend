@@ -1,4 +1,8 @@
 # 公共配置，所有环境共用。环境差异在 application-{profile}.yml
+# JWT：默认密钥仅用于本地/非 prod；prod 在 application-prod.yml 中强制要求 JWT_SECRET
+jwt:
+  secret: ${JWT_SECRET:xinmiao-jwt-secret-key-at-least-32-bytes-long-for-hs256}
+
 spring:
   application:
     name: xinmiao
@@ -61,7 +65,8 @@ spring:
         database-name: SpringAiDatabase
   mvc:
     async:
-      request-timeout: 120000 # 120 秒（兜底超时）
+      # 异步请求兜底（含 SSE/Flux）；须 >= stream-token-gap-seconds + sse-grace-seconds，略大留余量
+      request-timeout: 180s
 
 app:
   # 缓存回源限流：Redis 不可用时限制同时回源 DB 的并发数，超出则 503，保障数据库存活
@@ -97,11 +102,16 @@ app:
     rate-limit:
       # 对话接口按用户滑动窗口限流（Redis ZSET + Lua），用于防慢速攻击与突发流量保护。
       enabled: true
-      per-user-per-minute: 10  # 降低为 10，作为 Semaphore 的补充（防慢速攻击 + 未来分布式扩展）
+      per-user-per-minute: 5  # 滑动窗口内每用户最多 5 次/分钟，与 Semaphore 并发控制配合
       window-seconds: 60
     timeout:
-      # LLM 侧流式响应超时（Reactor timeout）；超时会中断本次对话，避免连接长期占用。
-      seconds: 150
+      # HTTP：RestClient/WebClient 连接+读（传输层硬上限）
+      http-seconds: 150
+      # LLM 流式：相邻两次 token 的最大间隔（秒）；非流式 collect 前同语义。偏「卡死检测」，宜 30～60
+      # 兼容旧键 reactor-seconds
+      stream-token-gap-seconds: 45
+      # SSE：Controller 外层 Flux.timeout = stream-token-gap-seconds + 本值（收尾/publishOn/[DONE] 余量）
+      sse-grace-seconds: 5
     memory:
       # 对话记忆（RedisChatMemoryRepository）：
       # - ttl-hours：会话过期自动清理
