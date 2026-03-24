@@ -1,6 +1,6 @@
-package com.tree.chat.ingest;
+package com.tree.chat.infrastructure.ingest;
 
-import com.tree.chat.splitter.ChineseTextSplitter;
+import com.tree.chat.infrastructure.splitter.ChineseTextSplitter;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;

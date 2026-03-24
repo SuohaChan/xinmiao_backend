@@ -68,6 +68,12 @@ public class RedisConstants {
     /** 学生任务完成 Set TTL（天），约一学期（半年） */
     public static final long STU_TASK_DONE_TTL_DAYS = 200L;
 
+    // ===================== 任务发布推送幂等（MQ 消费去重） =====================
+    /** 任务发布推送幂等 key 前缀，key = 此前缀 + taskId，防止重复消费导致重复 WebSocket 推送 */
+    public static final String TASK_PUBLISH_DONE_KEY_PREFIX = PREFIX + "task:publish:done:";
+    /** 任务发布推送幂等占位 TTL（天）；通常只需覆盖重试窗口 */
+    public static final long TASK_PUBLISH_DONE_TTL_DAYS = 7L;
+
     /** 今日榜 key 前缀，实际 key = 此前缀 + yyyyMMdd，如 xinmiao:rank:today:20250302 */
     public static final String RANK_TODAY_KEY_PREFIX = PREFIX + "rank:today:";
 

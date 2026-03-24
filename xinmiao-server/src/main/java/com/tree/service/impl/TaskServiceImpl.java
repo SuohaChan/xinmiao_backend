@@ -13,12 +13,12 @@ import com.tree.entity.Clazz;
 import com.tree.entity.College;
 import com.tree.entity.Task;
 import com.tree.config.mq.RabbitConfig;
+import com.tree.config.mq.RabbitPublisherConfirmConfig;
 import com.tree.dto.TaskPublishMessage;
 import com.tree.service.ClassService;
 import com.tree.service.CollegeService;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -44,13 +44,16 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
     private final StudentTaskService studentTaskService;
     private final CollegeService collegeService;
     private final ClassService classService;
-    private final RabbitTemplate rabbitTemplate;
+    private final RabbitPublisherConfirmConfig rabbitPublisherConfirmConfig;
 
-    public TaskServiceImpl(StudentTaskService studentTaskService, CollegeService collegeService, ClassService classService, RabbitTemplate rabbitTemplate) {
+    public TaskServiceImpl(StudentTaskService studentTaskService,
+                            CollegeService collegeService,
+                            ClassService classService,
+                            RabbitPublisherConfirmConfig rabbitPublisherConfirmConfig) {
         this.studentTaskService = studentTaskService;
         this.collegeService = collegeService;
         this.classService = classService;
-        this.rabbitTemplate = rabbitTemplate;
+        this.rabbitPublisherConfirmConfig = rabbitPublisherConfirmConfig;
     }
 
     /** 根据学院/班级名称填充 collegeId、classId（未传 ID 时用） */
@@ -152,7 +155,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                rabbitTemplate.convertAndSend(
+                rabbitPublisherConfirmConfig.publishWithConfirmRetry(
                         RabbitConfig.EXCHANGE_TASK,
                         RabbitConfig.ROUTING_TASK_PUBLISH,
                         new TaskPublishMessage(taskId)

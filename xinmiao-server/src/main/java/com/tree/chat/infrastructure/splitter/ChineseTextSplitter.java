@@ -1,4 +1,4 @@
-package com.tree.chat.splitter;
+package com.tree.chat.infrastructure.splitter;
 
 import org.springframework.ai.transformer.splitter.TextSplitter;
 

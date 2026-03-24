@@ -1,4 +1,4 @@
-package com.tree.chat.rag;
+package com.tree.chat.infrastructure.rag;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

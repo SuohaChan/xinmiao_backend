@@ -1,12 +1,13 @@
 package com.tree.controller.student;
 
 import com.tree.annotation.mySystemLog;
-import com.tree.chat.service.AiChatService;
+import com.tree.chat.application.ChatApplicationService;
 import com.tree.context.StudentHolder;
 import com.tree.exception.BusinessException;
 import com.tree.result.ErrorCode;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.util.StringUtils;
@@ -21,20 +22,26 @@ import java.util.concurrent.RejectedExecutionException;
 /**
  * @author SuohaChan
  * @data 2025/9/9
- * 基于 Spring AI 的对话实现，仅做协议层；业务在 AiChatService。
+ * 基于 Spring AI 的对话实现，仅做协议层；业务在 ChatApplicationService。
  */
 @RestController
 @Slf4j
 @RequestMapping("student/chat")
 public class BasicChatController {
 
-    private final AiChatService aiChatService;
-    
+    private final ChatApplicationService chatApplicationService;
+    /** SSE 外层 Flux.timeout = stream-token-gap-seconds + sse-grace-seconds（略大于内层 token 间隔上限） */
+    private final int sseOuterTimeoutSeconds;
+
     @Resource
     private Scheduler sseScheduler;
 
-    public BasicChatController(AiChatService aiChatService) {
-        this.aiChatService = aiChatService;
+    public BasicChatController(ChatApplicationService chatApplicationService,
+                               @Value("${app.chat.timeout.stream-token-gap-seconds:${app.chat.timeout.reactor-seconds:45}}")
+                                       int streamTokenGapSeconds,
+                               @Value("${app.chat.timeout.sse-grace-seconds:5}") int sseGraceSeconds) {
+        this.chatApplicationService = chatApplicationService;
+        this.sseOuterTimeoutSeconds = Math.max(0, streamTokenGapSeconds) + Math.max(0, sseGraceSeconds);
     }
 
     /**
@@ -48,7 +55,7 @@ public class BasicChatController {
                              @RequestHeader(value = "X-Request-Id", required = false) String requestId,
                              @RequestHeader(value = "Use-RAG", defaultValue = "false") boolean useRag) {
         Long studentId = requireStudentId();
-        return aiChatService.chatReactive(studentId, question, requestId, useRag);
+        return chatApplicationService.chatReactive(studentId, question, requestId, useRag);
     }
 
     /**
@@ -79,14 +86,14 @@ public class BasicChatController {
         }
         log.info("[SSE] 请求 | userId={} | useRag={}", userId, useRag);
         
-        return aiChatService.streamChat(userId, request.message(), requestId, useRag)
+        return chatApplicationService.streamChat(userId, request.message(), requestId, useRag)
                 .doOnSubscribe(s -> log.debug("[SSE] 订阅 | userId={}", userId))
                 .doFinally(signal -> log.debug("[SSE] 完成 | userId={} | signal={}", userId, signal))
                 .publishOn(sseScheduler)
                 .map(content -> ServerSentEvent.builder(content).event("message").build())
                 .concatWithValues(ServerSentEvent.builder("[DONE]").event("done").build())
                 .timeout(
-                        Duration.ofSeconds(60),
+                        Duration.ofSeconds(sseOuterTimeoutSeconds),
                         Flux.just(
                                 ServerSentEvent.builder("响应超时，请检查网络连接").event("timeout").build(),
                                 ServerSentEvent.builder("[DONE]").event("done").build()
@@ -107,7 +114,10 @@ public class BasicChatController {
                     } else {
                         msg = "AI 回复失败，请稍后重试";
                     }
-                    return Flux.just(ServerSentEvent.builder(msg).event("error").build());
+                    return Flux.just(
+                            ServerSentEvent.builder(msg).event("error").build(),
+                            ServerSentEvent.builder("[DONE]").event("done").build()
+                    );
                 });
     }
 

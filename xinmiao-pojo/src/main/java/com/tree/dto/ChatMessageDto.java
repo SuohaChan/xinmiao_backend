@@ -13,4 +13,6 @@ import lombok.NoArgsConstructor;
 public class ChatMessageDto {
     private String messageType; // USER, ASSISTANT, SYSTEM
     private String text;
+    /** 该条消息的 token 估算值（写入时计算，用于后续预算裁剪快速累加） */
+    private Integer tokenCount;
 }

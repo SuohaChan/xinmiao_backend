@@ -1,5 +1,6 @@
 package com.tree.listener;
 
+import com.tree.constant.RedisConstants;
 import com.tree.config.mq.RabbitConfig;
 import com.tree.dto.TaskPublishMessage;
 import com.tree.dto.TaskPushDto;
@@ -8,8 +9,11 @@ import com.tree.service.TaskService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * MQ 消费者：消费“任务发布”消息，查库后按校级/院级/班级推送 WebSocket。
@@ -21,6 +25,7 @@ public class TaskPublishMqConsumer {
 
     private final TaskService taskService;
     private final SimpMessagingTemplate simpMessagingTemplate;
+    private final StringRedisTemplate stringRedisTemplate;
 
     @RabbitListener(queues = RabbitConfig.QUEUE_TASK_PUBLISH)
     public void onTaskPublished(TaskPublishMessage message) {
@@ -37,15 +42,27 @@ public class TaskPublishMqConsumer {
             return;
         }
 
+        // 幂等：同一个 taskId 的推送只会通过一次占位，避免 MQ 重试/重复投递导致重复 WebSocket 推送
+        String dedupKey = RedisConstants.TASK_PUBLISH_DONE_KEY_PREFIX + task.getId();
+        Boolean isFirst = stringRedisTemplate.opsForValue().setIfAbsent(
+                dedupKey,
+                "1",
+                RedisConstants.TASK_PUBLISH_DONE_TTL_DAYS,
+                TimeUnit.DAYS
+        );
+        if (!Boolean.TRUE.equals(isFirst)) {
+            log.debug("Skip duplicate task push (idempotent hit) taskId={}", task.getId());
+            return;
+        }
+
         TaskPushDto payload = toPushDto(task);
         String level = task.getLevel();
         Long collegeId = task.getCollegeId();
         Long classId = task.getClassId();
 
         if ("校级".equals(level)) {
-            // 禁用“校级”广播推送：校级订阅者数量可能很大，容易造成广播风暴与尾延迟尖刺。
-            // 如需启用，建议配合更严格的限流/分片/外置 Broker 或按灰度范围推送。
-            log.debug("Skip school-level task push to avoid broadcast storm. taskId={}", task.getId());
+            // 校级任务：废弃不推送（保留占位逻辑，避免广播风暴与尾延迟尖刺）
+            log.debug("Skip school-level task push (disabled). taskId={}", task.getId());
         } else if ("院级".equals(level) && collegeId != null) {
             simpMessagingTemplate.convertAndSend("/topic/task/college/" + collegeId, payload);
         } else if ("班级".equals(level) && classId != null) {

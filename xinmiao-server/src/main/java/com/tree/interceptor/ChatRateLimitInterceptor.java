@@ -57,7 +57,7 @@ public class ChatRateLimitInterceptor implements HandlerInterceptor {
 
     @Value("${app.chat.rate-limit.enabled:true}")
     private boolean enabled;
-    @Value("${app.chat.rate-limit.per-user-per-minute:30}")
+    @Value("${app.chat.rate-limit.per-user-per-minute:5}")
     private int perUserPerMinute;
     @Value("${app.chat.rate-limit.window-seconds:60}")
     private int windowSeconds;
@@ -67,6 +67,15 @@ public class ChatRateLimitInterceptor implements HandlerInterceptor {
             InterceptorResponseHelper responseHelper) {
         this.redisTemplate = redisTemplate;
         this.responseHelper = responseHelper;
+    }
+
+    private boolean isSseRequest(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        if (uri != null && uri.contains("/student/chat/stream")) {
+            return true;
+        }
+        String accept = request.getHeader("Accept");
+        return accept != null && accept.contains("text/event-stream");
     }
 
     @Override
@@ -96,6 +105,14 @@ public class ChatRateLimitInterceptor implements HandlerInterceptor {
 
         if (allowed == null || allowed == 0) {
             log.warn("Chat rate limit exceeded (sliding window): userId={}, limit={}", userId, perUserPerMinute);
+            // SSE：只返回状态码，不写 JSON body，避免 text/event-stream 已开始输出后再写 writer
+            if (isSseRequest(request)) {
+                if (!response.isCommitted()) {
+                    response.setStatus(429);
+                }
+                return false;
+            }
+            // 非 SSE：继续写统一 JSON
             responseHelper.writeResultFail(response, 429, ErrorCode.RATE_LIMIT.getCode(), ErrorCode.RATE_LIMIT.getDefaultMessage());
             return false;
         }

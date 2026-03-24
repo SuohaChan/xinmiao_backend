@@ -25,14 +25,14 @@ public class ThreadPoolConfig {
     private int ragCorePoolSize;
     @Value("${app.chat.rag.max-pool-size:100}")
     private int ragMaxPoolSize;
-    @Value("${app.chat.rag.queue-capacity:1000}")
+    @Value("${app.chat.rag.queue-capacity:256}")
     private int ragQueueCapacity;
 
     @Value("${app.chat.sse.core-pool-size:50}")
     private int sseCorePoolSize;
     @Value("${app.chat.sse.max-pool-size:300}")
     private int sseMaxPoolSize;
-    @Value("${app.chat.sse.queue-capacity:3000}")
+    @Value("${app.chat.sse.queue-capacity:512}")
     private int sseQueueCapacity;
 
     /**

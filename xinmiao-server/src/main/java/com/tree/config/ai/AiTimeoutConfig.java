@@ -11,7 +11,7 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.http.client.reactive.JdkClientHttpConnector;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.reactive.function.client.WebClient;
-import com.tree.chat.rag.RagProperties;
+import com.tree.chat.infrastructure.rag.RagProperties;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
@@ -26,8 +26,8 @@ public class AiTimeoutConfig {
     @Bean
     @org.springframework.context.annotation.Primary
     public RestClient.Builder restClientBuilder(
-            @Value("${app.chat.timeout.seconds:90}") int timeoutSeconds) {
-        return restClientBuilderWithTimeout(timeoutSeconds);
+            @Value("${app.chat.timeout.http-seconds:150}") int httpTimeoutSeconds) {
+        return restClientBuilderWithTimeout(httpTimeoutSeconds);
     }
 
     /** 向量库专用：同一工厂传入更短超时，供 ChromaApi 使用 */
@@ -55,8 +55,8 @@ public class AiTimeoutConfig {
 
     @Bean
     public WebClient.Builder webClientBuilder(
-            @Value("${app.chat.timeout.seconds:90}") int timeoutSeconds) {
-        return webClientBuilderWithTimeout(timeoutSeconds);
+            @Value("${app.chat.timeout.http-seconds:150}") int httpTimeoutSeconds) {
+        return webClientBuilderWithTimeout(httpTimeoutSeconds);
     }
 
     /** 统一工厂：根据超时秒数创建带 connect/read 超时的 RestClient.Builder */
@@ -71,13 +71,17 @@ public class AiTimeoutConfig {
         return RestClient.builder().requestFactory(factory);
     }
 
-    /** 统一工厂：根据超时秒数创建带 connect 超时的 WebClient.Builder */
+    /**
+     * 统一工厂：connect + 读响应（含 body）超时，与 {@link #restClientBuilderWithTimeout} 的 connect/read 对齐。
+     * 读超时由 {@link JdkClientHttpConnector#setReadTimeout} 控制。
+     */
     public static WebClient.Builder webClientBuilderWithTimeout(int timeoutSeconds) {
         Duration timeout = Duration.ofSeconds(Math.max(1, timeoutSeconds));
         HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(timeout)
                 .build();
-        var connector = new JdkClientHttpConnector(httpClient);
+        JdkClientHttpConnector connector = new JdkClientHttpConnector(httpClient);
+        connector.setReadTimeout(timeout);
         return WebClient.builder().clientConnector(connector);
     }
 }

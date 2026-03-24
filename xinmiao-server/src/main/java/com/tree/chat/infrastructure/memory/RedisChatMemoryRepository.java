@@ -1,7 +1,9 @@
-package com.tree.chat.memory;
+package com.tree.chat.infrastructure.memory;
 
+import com.tree.chat.domain.port.ChatMemoryStore;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tree.chat.domain.port.TokenCounter;
 import com.tree.dto.ChatMessageDto;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -25,7 +27,7 @@ import java.util.concurrent.TimeUnit;
  * 基于 Redis 的对话记忆持久化实现。
  * <p>
  * 实现 Spring AI 的 {@link ChatMemoryRepository} 接口（依赖倒置），
- * 上层 {@code AiChatService} 仅依赖接口而非 Redis 实现，后续可替换为 MySQL 等存储而不改业务代码。
+ * 上层 {@code ChatApplicationService} 仅依赖接口而非 Redis 实现，后续可替换为 MySQL 等存储而不改业务代码。
  * <p>
  * 存储结构：
  * <ul>
@@ -46,7 +48,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Repository
-public class RedisChatMemoryRepository implements ChatMemoryRepository {
+public class RedisChatMemoryRepository implements ChatMemoryRepository, ChatMemoryStore {
 
     private static final String KEY_PREFIX = "chat:memory:";
     private static final String CONVERSATIONS_SET = "chat:memory:conversations";
@@ -54,15 +56,17 @@ public class RedisChatMemoryRepository implements ChatMemoryRepository {
 
     private final StringRedisTemplate template;
     private final ObjectMapper objectMapper;
+    private final TokenCounter tokenCounter;
 
     @Value("${app.chat.memory.ttl-hours:168}") // 默认 7 天
     private long ttlHours;
     @Value("${app.chat.memory.max-messages-per-conversation:50}")
     private int maxMessagesPerConversation;
 
-    public RedisChatMemoryRepository(StringRedisTemplate template, ObjectMapper objectMapper) {
+    public RedisChatMemoryRepository(StringRedisTemplate template, ObjectMapper objectMapper, TokenCounter tokenCounter) {
         this.template = template;
         this.objectMapper = objectMapper;
+        this.tokenCounter = tokenCounter;
     }
 
     /**
@@ -88,6 +92,20 @@ public class RedisChatMemoryRepository implements ChatMemoryRepository {
     @Override
     @NonNull
     public List<Message> findByConversationId(@NonNull String conversationId) {
+        List<ChatMessageDto> dtos = findDtosByConversationId(conversationId);
+        if (dtos.isEmpty()) return List.of();
+        List<Message> messages = new ArrayList<>(dtos.size());
+        for (ChatMessageDto dto : dtos) {
+            messages.add(toMessage(dto));
+        }
+        return messages;
+    }
+
+    /**
+     * 按会话 ID 读取原始 DTO（包含 tokenCount 元数据）。
+     */
+    @NonNull
+    public List<ChatMessageDto> findDtosByConversationId(@NonNull String conversationId) {
         if (conversationId.isBlank()) return List.of();
         String key = KEY_PREFIX + conversationId;
         String json;
@@ -100,12 +118,7 @@ public class RedisChatMemoryRepository implements ChatMemoryRepository {
         if (json == null || json.isBlank()) return List.of();
         try {
             List<ChatMessageDto> dtos = objectMapper.readValue(json, LIST_TYPE);
-            if (dtos == null) return List.of();
-            List<Message> messages = new ArrayList<>(dtos.size());
-            for (ChatMessageDto dto : dtos) {
-                messages.add(toMessage(dto));
-            }
-            return messages;
+            return dtos != null ? dtos : List.of();
         } catch (Exception e) {
             log.warn("Redis 对话记忆反序列化失败，降级为空 conversationId={}: {}", conversationId, e.getMessage(), e);
             return List.of();
@@ -165,10 +178,14 @@ public class RedisChatMemoryRepository implements ChatMemoryRepository {
     /**
      * Spring AI {@link Message} → {@link ChatMessageDto}（序列化用）。
      */
-    private static ChatMessageDto toDto(Message m) {
+    private ChatMessageDto toDto(Message m) {
         String type = m.getMessageType() != null ? m.getMessageType().name() : "USER";
         String text = m.getText() != null ? m.getText() : "";
-        return new ChatMessageDto(type, text);
+        ChatMessageDto dto = new ChatMessageDto();
+        dto.setMessageType(type);
+        dto.setText(text);
+        dto.setTokenCount(tokenCounter.count(text));
+        return dto;
     }
 
     /**

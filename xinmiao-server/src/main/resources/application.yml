@@ -84,6 +84,18 @@ app:
       # 回源许可等待超时（毫秒）：超过该时间仍拿不到 permit，则快速失败返回 503（SERVICE_BUSY）
       acquire-timeout-millis: 2000
   chat:
+    limit:
+      # 单次输入预算（system + user，token 估算值）
+      max-input-budget-tokens: 70000
+      # 单次输出上限（第 0 步先配置，后续在模型 options 中接入）
+      max-output-tokens: 1500
+      # 输入预算安全余量（token），用于覆盖估算误差
+      input-safety-reserve-tokens: 2000
+      # 剩余输入预算分配给 RAG 的比例（其余给 memory/对话上下文）
+      rag-budget-ratio: 0.6
+      # memory 保留条数上下限（建议偶数，保持问答成对）
+      memory-min-messages: 2
+      memory-max-messages: 10
     # RAG 检索专用线程池（阻塞操作隔离）
     rag:
       core-pool-size: 20
@@ -169,3 +181,9 @@ springdoc:
   api-docs:
     path: /v3/api-docs
     enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus

@@ -6,7 +6,6 @@ import com.tree.exception.BusinessException;
 import com.tree.result.ErrorCode;
 import com.tree.result.Result;
 import com.tree.service.CheckInService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 
