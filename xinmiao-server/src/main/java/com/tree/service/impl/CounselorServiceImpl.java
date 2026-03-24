@@ -10,19 +10,22 @@ import com.tree.mapper.CounselorMapper;
 import com.tree.service.CounselorService;
 import com.tree.util.JwtUtils;
 import com.tree.utils.LoginUserUtils;
+import com.tree.util.TokenExtractUtils;
 import com.tree.dto.CounselorDto;
 import com.tree.dto.CounselorShowDto;
 import com.tree.dto.LoginDto;
-import com.tree.dto.RefreshTokenDto;
 import com.tree.entity.Counselor;
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.tree.result.ErrorCode;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -39,6 +42,8 @@ public class CounselorServiceImpl extends ServiceImpl<CounselorMapper, Counselor
     private final StringRedisTemplate stringRedisTemplate;
     private final JwtUtils jwtUtils;
     private final PasswordEncoder passwordEncoder;
+    @Value("${app.auth.refresh-access-max-stale-seconds:600}")
+    private long refreshAccessMaxStaleSeconds;
 
     public CounselorServiceImpl(StringRedisTemplate stringRedisTemplate,
                                 JwtUtils jwtUtils,
@@ -119,11 +124,15 @@ public class CounselorServiceImpl extends ServiceImpl<CounselorMapper, Counselor
     }
 
     @Override
-    public Map<String, Object> refreshToken(RefreshTokenDto dto) {
-        if (dto == null || dto.getRefreshToken() == null || dto.getRefreshToken().isBlank()) {
-            throw new BusinessException(ErrorCode.PARAM_INVALID, "refreshToken 不能为空");
+    public Map<String, Object> refreshToken(HttpServletRequest request) {
+        String rt = TokenExtractUtils.getCookieValue(request, "refreshToken");
+        if (rt == null || rt.isBlank()) {
+            throw new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID, "Cookie 中 refreshToken 缺失");
         }
-        String rt = dto.getRefreshToken().trim();
+        String oldAccessToken = TokenExtractUtils.getBearerToken(request);
+        if (oldAccessToken == null || oldAccessToken.isBlank()) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authorization 缺失");
+        }
         String refreshKey = RedisConstants.REFRESH_TOKEN_KEY + rt;
         Map<Object, Object> userMap;
         try {
@@ -137,6 +146,31 @@ public class CounselorServiceImpl extends ServiceImpl<CounselorMapper, Counselor
         }
         if (!"Counselor".equalsIgnoreCase(String.valueOf(userMap.get("type")))) {
             throw new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID, "refreshToken 类型不匹配");
+        }
+
+        Claims claims = jwtUtils.parseClaimsAllowExpired(oldAccessToken);
+        if (claims == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 无效");
+        }
+        String tokenSub = claims.getSubject();
+        String tokenType = claims.get("type", String.class);
+        if (tokenSub == null || tokenSub.isBlank() || tokenType == null || tokenType.isBlank()) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 结构异常");
+        }
+        String refreshUserId = String.valueOf(userMap.get("id")).replace("\"", "").trim();
+        if (!refreshUserId.equals(tokenSub.replace("\"", "").trim())) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 与 refreshToken 用户不一致");
+        }
+        if (!"Counselor".equalsIgnoreCase(tokenType)) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 类型不匹配");
+        }
+        Date exp = claims.getExpiration();
+        if (exp == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 缺少过期时间");
+        }
+        long expiredSeconds = (System.currentTimeMillis() - exp.getTime()) / 1000;
+        if (expiredSeconds > refreshAccessMaxStaleSeconds) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 过期过久，请重新登录");
         }
         try {
             stringRedisTemplate.delete(refreshKey);
@@ -172,15 +206,15 @@ public class CounselorServiceImpl extends ServiceImpl<CounselorMapper, Counselor
     }
 
     @Override
-    public void logout(String refreshTokenFromBody) {
+    public void logout(String refreshTokenFromCookie) {
         String accessToken = LoginUserUtils.getCurrentToken();
         if (accessToken == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "未找到登录信息");
         }
         jwtUtils.blacklist(accessToken);
-        if (refreshTokenFromBody != null && !refreshTokenFromBody.isBlank()) {
+        if (refreshTokenFromCookie != null && !refreshTokenFromCookie.isBlank()) {
             try {
-                stringRedisTemplate.delete(RedisConstants.REFRESH_TOKEN_KEY + refreshTokenFromBody.trim());
+                stringRedisTemplate.delete(RedisConstants.REFRESH_TOKEN_KEY + refreshTokenFromCookie.trim());
             } catch (Exception e) {
                 log.warn("Redis unavailable during logout refreshToken delete, fail with 503.", e);
                 throw new BusinessException(ErrorCode.SERVICE_BUSY, "服务繁忙，请稍后重试");

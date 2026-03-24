@@ -2,7 +2,6 @@ package com.tree.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.tree.dto.LoginDto;
-import com.tree.dto.RefreshTokenDto;
 import com.tree.dto.RegisterDto;
 import com.tree.entity.Student;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,10 +20,10 @@ public interface StudentService extends IService<Student> {
     Map<String, Object> login(LoginDto loginDto);
 
     /** 返回 token、refreshToken、expiresIn */
-    Map<String, Object> refreshToken(RefreshTokenDto dto);
+    Map<String, Object> refreshToken(HttpServletRequest request);
 
     void updateStudent(Student student);
 
-    /** @param refreshTokenFromBody 可选，传则从 Redis 删除该 refresh 使立即失效 */
-    void logout(String refreshTokenFromBody);
+    /** @param refreshTokenFromCookie 可选，传则从 Redis 删除该 refresh 使立即失效 */
+    void logout(String refreshTokenFromCookie);
 }

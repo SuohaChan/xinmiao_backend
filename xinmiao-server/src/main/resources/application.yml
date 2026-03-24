@@ -69,6 +69,14 @@ spring:
       request-timeout: 180s
 
 app:
+  auth:
+    refresh-cookie:
+      name: refreshToken
+      path: /
+      secure: false
+      same-site: Lax
+    # 旧 accessToken 允许过期的最大时长（秒），用于 refresh 双校验
+    refresh-access-max-stale-seconds: 600
   # 缓存回源限流：Redis 不可用时限制同时回源 DB 的并发数，超出则 503，保障数据库存活
   cache:
     fallback:
@@ -80,7 +88,8 @@ app:
     rag:
       core-pool-size: 20
       max-pool-size: 100
-      queue-capacity: 1000
+      # 队列不宜过大，避免堆积导致尾延迟尖刺；满队列时 AbortPolicy 快速失败
+      queue-capacity: 256
 
       # RAG 检索的“响应式超时”（RagService.retrieveDocumentsAsync 使用）。
       # 超时/异常会降级为无 RAG：只返回空文档列表，让大模型直接回答。
@@ -95,14 +104,14 @@ app:
     sse:
       core-pool-size: 50
       max-pool-size: 300
-      queue-capacity: 3000
+      queue-capacity: 512
     stream:
       # LLM 流式/非流式对话的最大并发（本机实例内，由 Semaphore 控制）。
       max-concurrent: 30
     rate-limit:
       # 对话接口按用户滑动窗口限流（Redis ZSET + Lua），用于防慢速攻击与突发流量保护。
       enabled: true
-      per-user-per-minute: 5  # 滑动窗口内每用户最多 5 次/分钟，与 Semaphore 并发控制配合
+      per-user-per-minute: 20  # 滑动窗口内每用户最多 20 次/分钟，与 Semaphore 并发控制配合
       window-seconds: 60
     timeout:
       # HTTP：RestClient/WebClient 连接+读（传输层硬上限）

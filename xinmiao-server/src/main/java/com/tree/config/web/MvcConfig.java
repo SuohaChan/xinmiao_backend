@@ -22,6 +22,7 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurationSupport;
 
+import java.time.Duration;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -54,6 +55,10 @@ public class MvcConfig extends WebMvcConfigurationSupport {
     @Value("${cors.allowed-origins:http://localhost:8000}")
     private String corsAllowedOrigins;
 
+    /** 与 spring.mvc.async.request-timeout 一致，避免此处写死与全局配置不一致 */
+    @Value("${spring.mvc.async.request-timeout:180s}")
+    private Duration asyncRequestTimeout;
+
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         String[] origins = corsAllowedOrigins.split("\\s*,\\s*");
@@ -81,15 +86,13 @@ public class MvcConfig extends WebMvcConfigurationSupport {
                         "/student/login",
                         "/student/register",
                         "/student/refresh",
-                        "/student/logout",
                         "/student/validate",
                         "/student/face",
                         // 辅导员端免认证
                         "/counselor/login",
                         "/counselor/register",
                         "/counselor/refresh",
-                        "/counselor/refreshToken",
-                        "/counselor/logout"
+                        "/counselor/refreshToken"
                 ).order(0);
 
         // 1: 学生端专属（规范路径 /student/**，除登录注册等已排除项）
@@ -99,7 +102,6 @@ public class MvcConfig extends WebMvcConfigurationSupport {
                         "/student/login",
                         "/student/register",
                         "/student/refresh",
-                        "/student/logout",
                         "/student/validate",
                         "/student/face"
                 )
@@ -156,8 +158,9 @@ public class MvcConfig extends WebMvcConfigurationSupport {
     @Override
     public void configureAsyncSupport(AsyncSupportConfigurer configurer) {
         configurer.setTaskExecutor(mvcTaskExecutor());
-        configurer.setDefaultTimeout(60_000); // 默认异步超时 60 秒
-        log.info("[MVC 异步支持] 配置完成 | 默认超时=60 秒");
+        configurer.setDefaultTimeout(asyncRequestTimeout.toMillis());
+        log.info("[MVC 异步支持] 配置完成 | defaultTimeout={} (spring.mvc.async.request-timeout)",
+                asyncRequestTimeout);
     }
 
 

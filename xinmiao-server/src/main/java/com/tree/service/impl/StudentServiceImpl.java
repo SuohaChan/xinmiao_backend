@@ -8,7 +8,6 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.tree.dto.LoginDto;
-import com.tree.dto.RefreshTokenDto;
 import com.tree.dto.RegisterDto;
 import com.tree.dto.StudentDto;
 import com.tree.dto.StudentShowDto;
@@ -19,7 +18,9 @@ import com.tree.entity.StudentClass;
 import com.tree.entity.StudentTask;
 import com.tree.entity.Task;
 import jakarta.servlet.http.HttpServletRequest;
+import io.jsonwebtoken.Claims;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -38,7 +39,9 @@ import com.tree.service.StudentService;
 import com.tree.util.JwtUtils;
 import com.tree.result.ErrorCode;
 import com.tree.utils.LoginUserUtils;
+import com.tree.util.TokenExtractUtils;
 import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +65,8 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
     private final TaskMapper taskMapper;
     private final CollegeService collegeService;
     private final ClassService classService;
+    @Value("${app.auth.refresh-access-max-stale-seconds:600}")
+    private long refreshAccessMaxStaleSeconds;
 
     public StudentServiceImpl(StringRedisTemplate stringRedisTemplate,
                               JwtUtils jwtUtils,
@@ -90,12 +95,6 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> register(HttpServletRequest request, RegisterDto registerDto) {
-//        Object numberValidated = request.getSession().getAttribute("numberValidated");
-//        Object faceValidated = request.getSession().getAttribute("faceValidated");
-//        if (numberValidated == null || !((Boolean) numberValidated)
-//                || faceValidated == null || !(Boolean) faceValidated) {
-//            return Result.fail("您还未验证或验证还未通过，请先验证");
-//        }
 
         String username = registerDto.getUsername();
         if (StringUtils.isEmpty(username)) {
@@ -243,11 +242,15 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
     }
 
     @Override
-    public Map<String, Object> refreshToken(RefreshTokenDto dto) {
-        if (dto == null || dto.getRefreshToken() == null || dto.getRefreshToken().isBlank()) {
-            throw new BusinessException(ErrorCode.PARAM_INVALID, "refreshToken 不能为空");
+    public Map<String, Object> refreshToken(HttpServletRequest request) {
+        String rt = TokenExtractUtils.getCookieValue(request, "refreshToken");
+        if (rt == null || rt.isBlank()) {
+            throw new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID, "Cookie 中 refreshToken 缺失");
         }
-        String rt = dto.getRefreshToken().trim();
+        String oldAccessToken = TokenExtractUtils.getBearerToken(request);
+        if (oldAccessToken == null || oldAccessToken.isBlank()) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authorization 缺失");
+        }
         String refreshKey = RedisConstants.REFRESH_TOKEN_KEY + rt;
         Map<Object, Object> userMap;
         try {
@@ -261,6 +264,31 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
         }
         if (!"Student".equalsIgnoreCase(String.valueOf(userMap.get("type")))) {
             throw new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID, "refreshToken 类型不匹配");
+        }
+
+        Claims claims = jwtUtils.parseClaimsAllowExpired(oldAccessToken);
+        if (claims == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 无效");
+        }
+        String tokenSub = claims.getSubject();
+        String tokenType = claims.get("type", String.class);
+        if (tokenSub == null || tokenSub.isBlank() || tokenType == null || tokenType.isBlank()) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 结构异常");
+        }
+        String refreshUserId = String.valueOf(userMap.get("id")).replace("\"", "").trim();
+        if (!refreshUserId.equals(tokenSub.replace("\"", "").trim())) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 与 refreshToken 用户不一致");
+        }
+        if (!"Student".equalsIgnoreCase(tokenType)) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 类型不匹配");
+        }
+        Date exp = claims.getExpiration();
+        if (exp == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 缺少过期时间");
+        }
+        long expiredSeconds = (System.currentTimeMillis() - exp.getTime()) / 1000;
+        if (expiredSeconds > refreshAccessMaxStaleSeconds) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 过期过久，请重新登录");
         }
         try {
             stringRedisTemplate.delete(refreshKey);
@@ -321,15 +349,15 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
     }
 
     @Override
-    public void logout(String refreshTokenFromBody) {
+    public void logout(String refreshTokenFromCookie) {
         String accessToken = LoginUserUtils.getCurrentToken();
         if (accessToken == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "未找到登录信息");
         }
         jwtUtils.blacklist(accessToken);
-        if (refreshTokenFromBody != null && !refreshTokenFromBody.isBlank()) {
+        if (refreshTokenFromCookie != null && !refreshTokenFromCookie.isBlank()) {
             try {
-                stringRedisTemplate.delete(RedisConstants.REFRESH_TOKEN_KEY + refreshTokenFromBody.trim());
+                stringRedisTemplate.delete(RedisConstants.REFRESH_TOKEN_KEY + refreshTokenFromCookie.trim());
             } catch (Exception e) {
                 log.warn("Redis unavailable during logout refreshToken delete, fail with 503.", e);
                 throw new BusinessException(ErrorCode.SERVICE_BUSY, "服务繁忙，请稍后重试");
@@ -337,6 +365,7 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
         }
         log.info("用户登出成功，JWT 已加入黑名单");
     }
+
 }
 
 

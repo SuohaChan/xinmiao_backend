@@ -2,7 +2,6 @@ package com.tree.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.tree.dto.LoginDto;
-import com.tree.dto.RefreshTokenDto;
 import com.tree.entity.Counselor;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -17,7 +16,7 @@ public interface CounselorService extends IService<Counselor> {
 
     Map<String, Object> login(LoginDto loginDto);
 
-    Map<String, Object> refreshToken(RefreshTokenDto dto);
+    Map<String, Object> refreshToken(HttpServletRequest request);
 
-    void logout(String refreshTokenFromBody);
+    void logout(String refreshTokenFromCookie);
 }
