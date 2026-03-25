@@ -20,6 +20,10 @@ spring:
       mandatory: true
     listener:
       simple:
+        # 消费端并发固化为 1：避免同时处理多条导致 WebSocket/STOMP 发送瞬时叠加
+        concurrency: 1
+        max-concurrency: 1
+        prefetch: 1
         retry:
           enabled: true
           max-attempts: 3
@@ -155,6 +159,17 @@ app:
       send-time-limit-ms: 10000
       send-buffer-size-limit-bytes: 1048576
       message-size-limit-bytes: 65536
+
+  # 任务推送（WebSocket）消费策略：班级更快、院级更稳
+  task-push:
+    college:
+      # 院级队列消费后限速（毫秒）：用于压平 fanout 提交节奏；0 表示不 sleep
+      sleep-ms: 300
+    class:
+      # 班级队列 consumer 并发（1~N）
+      concurrency: 2
+      # 班级队列预取（prefetch）
+      prefetch: 10
 
 mybatis-plus:
   configuration:

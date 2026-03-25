@@ -14,12 +14,22 @@ import org.springframework.stereotype.Component;
 @Component
 public class TaskPublishDlqConsumer {
 
-    @RabbitListener(queues = RabbitConfig.QUEUE_TASK_PUBLISH_DLQ)
-    public void onDeadLetter(TaskPublishMessage message) {
+    @RabbitListener(queues = RabbitConfig.QUEUE_TASK_PUBLISH_COLLEGE_DLQ)
+    public void onCollegeDeadLetter(TaskPublishMessage message) {
+        onDeadLetterInternal("college", message);
+    }
+
+    @RabbitListener(queues = RabbitConfig.QUEUE_TASK_PUBLISH_CLASS_DLQ)
+    public void onClassDeadLetter(TaskPublishMessage message) {
+        onDeadLetterInternal("class", message);
+    }
+
+    private void onDeadLetterInternal(String queueType, TaskPublishMessage message) {
         if (message == null) {
-            log.error("[DLQ 告警] 任务发布消息消费失败进入死信队列，消息体为空，请排查主队列消费者异常原因");
+            log.error("[DLQ 告警] 任务发布消息消费失败进入死信队列 type={}，消息体为空，请排查主队列消费者异常原因", queueType);
             return;
         }
-        log.error("[DLQ 告警] 任务发布消息消费失败进入死信队列 taskId={}，请排查主队列消费者异常原因并人工处理（可考虑重新投递或查库补偿）", message.getTaskId());
+        log.error("[DLQ 告警] 任务发布消息消费失败进入死信队列 type={} taskId={}，请排查主队列消费者异常原因并人工处理（可考虑重新投递或查库补偿）",
+                queueType, message.getTaskId());
     }
 }

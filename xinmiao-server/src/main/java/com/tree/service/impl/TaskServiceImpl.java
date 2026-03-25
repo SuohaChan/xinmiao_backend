@@ -84,7 +84,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         if (!saved) throw new BusinessException(ErrorCode.INTERNAL_ERROR, "任务创建失败");
         if (task.getIsPublished() == 1) {
             studentTaskService.linkStudentTask(task);
-            publishTaskMessageAfterCommit(task.getId());
+            publishTaskMessageAfterCommit(task);
         }
     }
 
@@ -143,21 +143,36 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         boolean updated = updateById(task);
         if (!updated) throw new BusinessException(ErrorCode.NOT_FOUND, "任务id不存在");
         if (task.getIsPublished() != null && task.getIsPublished() == 1) {
-            publishTaskMessageAfterCommit(task.getId());
+            publishTaskMessageAfterCommit(task);
         }
     }
 
     /**
      * 事务提交后投递 MQ：避免回滚导致“消息已发但 DB 未提交”。
      */
-    private void publishTaskMessageAfterCommit(Long taskId) {
-        if (taskId == null) return;
+    private void publishTaskMessageAfterCommit(Task task) {
+        if (task == null || task.getId() == null) return;
+        Long taskId = task.getId();
+        String level = task.getLevel();
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
+                // 校级任务不走推送，避免全局广播风暴
+                if ("校级".equals(level)) {
+                    return;
+                }
+                String routingKey;
+                if ("院级".equals(level)) {
+                    routingKey = RabbitConfig.ROUTING_TASK_PUBLISH_COLLEGE;
+                } else if ("班级".equals(level)) {
+                    routingKey = RabbitConfig.ROUTING_TASK_PUBLISH_CLASS;
+                } else {
+                    // 未知 level：不推送，避免错误广播
+                    return;
+                }
                 rabbitPublisherConfirmConfig.publishWithConfirmRetry(
                         RabbitConfig.EXCHANGE_TASK,
-                        RabbitConfig.ROUTING_TASK_PUBLISH,
+                        routingKey,
                         new TaskPublishMessage(taskId)
                 );
             }

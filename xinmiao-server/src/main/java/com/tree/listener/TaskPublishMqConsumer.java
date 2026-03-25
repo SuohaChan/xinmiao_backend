@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.TimeUnit;
@@ -27,8 +28,25 @@ public class TaskPublishMqConsumer {
     private final SimpMessagingTemplate simpMessagingTemplate;
     private final StringRedisTemplate stringRedisTemplate;
 
-    @RabbitListener(queues = RabbitConfig.QUEUE_TASK_PUBLISH)
-    public void onTaskPublished(TaskPublishMessage message) {
+    /**
+     * 院级推送限速（毫秒）：用于进一步压平 fanout 提交节奏，避免短时间内连续 convertAndSend 导致突刺。
+     * 班级推送不受该限速影响。
+     */
+    @Value("${app.task-push.college.sleep-ms:30}")
+    private long collegeSleepMs;
+
+    @RabbitListener(queues = RabbitConfig.QUEUE_TASK_PUBLISH_COLLEGE, containerFactory = "collegeRabbitListenerContainerFactory")
+    public void onCollegeTaskPublished(TaskPublishMessage message) {
+        onTaskPublishedInternal(message);
+        sleepQuietly(collegeSleepMs);
+    }
+
+    @RabbitListener(queues = RabbitConfig.QUEUE_TASK_PUBLISH_CLASS, containerFactory = "classRabbitListenerContainerFactory")
+    public void onClassTaskPublished(TaskPublishMessage message) {
+        onTaskPublishedInternal(message);
+    }
+
+    private void onTaskPublishedInternal(TaskPublishMessage message) {
         if (message == null || message.getTaskId() == null) {
             log.warn("task publish message invalid: {}", message);
             return;
@@ -48,8 +66,7 @@ public class TaskPublishMqConsumer {
                 dedupKey,
                 "1",
                 RedisConstants.TASK_PUBLISH_DONE_TTL_DAYS,
-                TimeUnit.DAYS
-        );
+                TimeUnit.DAYS);
         if (!Boolean.TRUE.equals(isFirst)) {
             log.debug("Skip duplicate task push (idempotent hit) taskId={}", task.getId());
             return;
@@ -79,5 +96,13 @@ public class TaskPublishMqConsumer {
                 .deadline(task.getDeadline())
                 .build();
     }
-}
 
+    private static void sleepQuietly(long ms) {
+        if (ms <= 0) return;
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+}
