@@ -4,7 +4,6 @@ import com.tree.constant.RedisConstants;
 import com.tree.exception.BusinessException;
 import com.tree.result.ErrorCode;
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -64,7 +63,8 @@ public class JwtUtils {
      * 校验 JWT：先查黑名单，再验签与过期。返回 payload，无效则返回 null。
      */
     public Claims verifyAndGetClaims(String token) {
-        if (token == null || token.isBlank()) return null;
+        if (token == null || token.isBlank())
+            return null;
         try {
             Claims claims = Jwts.parser()
                     .verifyWith(secretKey)
@@ -88,7 +88,8 @@ public class JwtUtils {
      * 仅解析并验签、过期，不查黑名单（供登出时拿 jti/exp 写入黑名单用）
      */
     public Claims parseClaims(String token) {
-        if (token == null || token.isBlank()) return null;
+        if (token == null || token.isBlank())
+            return null;
         try {
             return Jwts.parser().verifyWith(secretKey).build().parseSignedClaims(token).getPayload();
         } catch (Exception e) {
@@ -98,46 +99,12 @@ public class JwtUtils {
     }
 
     /**
-     * 解析 JWT（允许过期），用于 refresh 场景：
-     * - 仍要求签名合法
-     * - 返回 claims 供比对 sub/type
-     * - 会执行黑名单检查（已拉黑则返回 null）
-     */
-    public Claims parseClaimsAllowExpired(String token) {
-        if (token == null || token.isBlank()) return null;
-        try {
-            Claims claims = Jwts.parser()
-                    .verifyWith(secretKey)
-                    .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
-            if (isBlacklisted(claims.getId())) {
-                return null;
-            }
-            return claims;
-        } catch (ExpiredJwtException e) {
-            Claims claims = e.getClaims();
-            if (claims == null) {
-                return null;
-            }
-            if (isBlacklisted(claims.getId())) {
-                return null;
-            }
-            return claims;
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.debug("JWT parse allow-expired failed: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    /**
      * 将 JWT 加入黑名单（登出时调用），TTL 为剩余有效秒数
      */
     public void blacklist(String token) {
         Claims claims = parseClaims(token);
-        if (claims == null) return;
+        if (claims == null)
+            return;
         String jti = claims.getId();
         Date exp = claims.getExpiration();
         if (jti != null && exp != null) {

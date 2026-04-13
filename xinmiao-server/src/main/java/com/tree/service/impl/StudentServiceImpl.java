@@ -18,9 +18,7 @@ import com.tree.entity.StudentClass;
 import com.tree.entity.StudentTask;
 import com.tree.entity.Task;
 import jakarta.servlet.http.HttpServletRequest;
-import io.jsonwebtoken.Claims;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -41,7 +39,6 @@ import com.tree.result.ErrorCode;
 import com.tree.utils.LoginUserUtils;
 import com.tree.util.TokenExtractUtils;
 import java.time.LocalDateTime;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -65,17 +62,15 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
     private final TaskMapper taskMapper;
     private final CollegeService collegeService;
     private final ClassService classService;
-    @Value("${app.auth.refresh-access-max-stale-seconds:600}")
-    private long refreshAccessMaxStaleSeconds;
 
     public StudentServiceImpl(StringRedisTemplate stringRedisTemplate,
-                              JwtUtils jwtUtils,
-                              PasswordEncoder passwordEncoder,
-                              StudentClassMapper studentClassMapper,
-                              StudentTaskMapper studentTaskMapper,
-                              TaskMapper taskMapper,
-                              CollegeService collegeService,
-                              ClassService classService) {
+            JwtUtils jwtUtils,
+            PasswordEncoder passwordEncoder,
+            StudentClassMapper studentClassMapper,
+            StudentTaskMapper studentTaskMapper,
+            TaskMapper taskMapper,
+            CollegeService collegeService,
+            ClassService classService) {
         this.stringRedisTemplate = stringRedisTemplate;
         this.jwtUtils = jwtUtils;
         this.passwordEncoder = passwordEncoder;
@@ -126,22 +121,26 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
             throw e;
         }
 
-        //学生班级信息关联（学院/班级名称与 tb_college/tb_class 的 id 保持一致）
+        // 学生班级信息关联（学院/班级名称与 tb_college/tb_class 的 id 保持一致）
         StudentClass studentClass = new StudentClass();
         studentClass.setStudentId(student.getId());
         String college = request.getParameter("college");
         String clazz = request.getParameter("clazz");
-        if (StringUtils.isNotBlank(college)) studentClass.setCollege(college);
-        if (StringUtils.isNotBlank(clazz)) studentClass.setClazz(clazz);
+        if (StringUtils.isNotBlank(college))
+            studentClass.setCollege(college);
+        if (StringUtils.isNotBlank(clazz))
+            studentClass.setClazz(clazz);
         if (StringUtils.isNotBlank(college)) {
             College co = collegeService.getOne(Wrappers.<College>lambdaQuery().eq(College::getName, college));
-            if (co != null) studentClass.setCollegeId(co.getId());
+            if (co != null)
+                studentClass.setCollegeId(co.getId());
         }
         if (StringUtils.isNotBlank(clazz) && studentClass.getCollegeId() != null) {
             Clazz cz = classService.getOne(Wrappers.<Clazz>lambdaQuery()
                     .eq(Clazz::getName, clazz)
                     .eq(Clazz::getCollegeId, studentClass.getCollegeId()));
-            if (cz != null) studentClass.setClassId(cz.getId());
+            if (cz != null)
+                studentClass.setClassId(cz.getId());
         }
         int insertClass = studentClassMapper.insert(studentClass);
         if (insertClass <= 0) {
@@ -155,8 +154,7 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
                 .and(w -> w
                         .eq(Task::getLevel, "校级")
                         .or(q -> q.eq(Task::getLevel, "院级").eq(Task::getCollegeId, studentClass.getCollegeId()))
-                        .or(q -> q.eq(Task::getLevel, "班级").eq(Task::getClassId, studentClass.getClassId()))
-                );
+                        .or(q -> q.eq(Task::getLevel, "班级").eq(Task::getClassId, studentClass.getClassId())));
         List<Task> tasks = taskMapper.selectList(queryWrapper);
 
         if (!tasks.isEmpty()) {
@@ -177,8 +175,10 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
         userMap.put("id", student.getId().toString());
         userMap.put("type", "Student");
         // refreshToken 会话中冗余存储学院/班级 id：便于刷新后前端继续订阅 WebSocket（topic/college、topic/class）
-        if (studentClass.getCollegeId() != null) userMap.put("collegeId", String.valueOf(studentClass.getCollegeId()));
-        if (studentClass.getClassId() != null) userMap.put("classId", String.valueOf(studentClass.getClassId()));
+        if (studentClass.getCollegeId() != null)
+            userMap.put("collegeId", String.valueOf(studentClass.getCollegeId()));
+        if (studentClass.getClassId() != null)
+            userMap.put("classId", String.valueOf(studentClass.getClassId()));
         long accessTtlMs = RedisConstants.ACCESS_TOKEN_TTL.toMillis();
         String accessToken = jwtUtils.generateAccessToken(student.getId(), "Student", accessTtlMs);
         stringRedisTemplate.opsForHash().putAll(RedisConstants.REFRESH_TOKEN_KEY + refreshToken, userMap);
@@ -192,7 +192,8 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
     }
 
     /**
-     *  登录
+     * 登录
+     * 
      * @param loginDto
      * @return
      */
@@ -210,9 +211,9 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
         }
 
         String refreshToken = UUID.fastUUID().toString(true);
-        Map<String, Object> userMap = BeanUtil.beanToMap(BeanUtil.copyProperties(stu, StudentDto.class), new HashMap<>(), CopyOptions.create().setFieldValueEditor(
-                (fieldName, fieldValue) -> fieldName.equals("id") ? fieldValue.toString() : fieldValue
-        ));
+        Map<String, Object> userMap = BeanUtil.beanToMap(BeanUtil.copyProperties(stu, StudentDto.class),
+                new HashMap<>(), CopyOptions.create().setFieldValueEditor(
+                        (fieldName, fieldValue) -> fieldName.equals("id") ? fieldValue.toString() : fieldValue));
         userMap.put("id", stu.getId().toString());
         userMap.put("type", "Student");
 
@@ -220,10 +221,13 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
         String accessToken = jwtUtils.generateAccessToken(stu.getId(), "Student", accessTtlMs);
 
         // refreshToken 会话中冗余存储学院/班级 id
-        StudentClass sc = studentClassMapper.selectOne(Wrappers.<StudentClass>lambdaQuery().eq(StudentClass::getStudentId, stu.getId()));
+        StudentClass sc = studentClassMapper
+                .selectOne(Wrappers.<StudentClass>lambdaQuery().eq(StudentClass::getStudentId, stu.getId()));
         if (sc != null) {
-            if (sc.getCollegeId() != null) userMap.put("collegeId", String.valueOf(sc.getCollegeId()));
-            if (sc.getClassId() != null) userMap.put("classId", String.valueOf(sc.getClassId()));
+            if (sc.getCollegeId() != null)
+                userMap.put("collegeId", String.valueOf(sc.getCollegeId()));
+            if (sc.getClassId() != null)
+                userMap.put("classId", String.valueOf(sc.getClassId()));
         }
         stringRedisTemplate.opsForHash().putAll(RedisConstants.REFRESH_TOKEN_KEY + refreshToken, userMap);
         stringRedisTemplate.expire(RedisConstants.REFRESH_TOKEN_KEY + refreshToken, RedisConstants.REFRESH_TOKEN_TTL);
@@ -247,10 +251,6 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
         if (rt == null || rt.isBlank()) {
             throw new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID, "Cookie 中 refreshToken 缺失");
         }
-        String oldAccessToken = TokenExtractUtils.getBearerToken(request);
-        if (oldAccessToken == null || oldAccessToken.isBlank()) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "Authorization 缺失");
-        }
         String refreshKey = RedisConstants.REFRESH_TOKEN_KEY + rt;
         Map<Object, Object> userMap;
         try {
@@ -266,30 +266,6 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
             throw new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID, "refreshToken 类型不匹配");
         }
 
-        Claims claims = jwtUtils.parseClaimsAllowExpired(oldAccessToken);
-        if (claims == null) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 无效");
-        }
-        String tokenSub = claims.getSubject();
-        String tokenType = claims.get("type", String.class);
-        if (tokenSub == null || tokenSub.isBlank() || tokenType == null || tokenType.isBlank()) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 结构异常");
-        }
-        String refreshUserId = String.valueOf(userMap.get("id")).replace("\"", "").trim();
-        if (!refreshUserId.equals(tokenSub.replace("\"", "").trim())) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 与 refreshToken 用户不一致");
-        }
-        if (!"Student".equalsIgnoreCase(tokenType)) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 类型不匹配");
-        }
-        Date exp = claims.getExpiration();
-        if (exp == null) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 缺少过期时间");
-        }
-        long expiredSeconds = (System.currentTimeMillis() - exp.getTime()) / 1000;
-        if (expiredSeconds > refreshAccessMaxStaleSeconds) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "旧 AccessToken 过期过久，请重新登录");
-        }
         try {
             stringRedisTemplate.delete(refreshKey);
         } catch (Exception e) {
@@ -308,7 +284,8 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
         }
         try {
             stringRedisTemplate.opsForHash().putAll(RedisConstants.REFRESH_TOKEN_KEY + newRefreshToken, map);
-            stringRedisTemplate.expire(RedisConstants.REFRESH_TOKEN_KEY + newRefreshToken, RedisConstants.REFRESH_TOKEN_TTL);
+            stringRedisTemplate.expire(RedisConstants.REFRESH_TOKEN_KEY + newRefreshToken,
+                    RedisConstants.REFRESH_TOKEN_TTL);
         } catch (Exception e) {
             log.warn("Redis unavailable during refreshToken rotate, fail with 503. userId={}", userId, e);
             throw new BusinessException(ErrorCode.SERVICE_BUSY, "服务繁忙，请稍后重试");
@@ -367,7 +344,3 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
     }
 
 }
-
-
-
-

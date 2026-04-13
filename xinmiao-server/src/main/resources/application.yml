@@ -79,8 +79,6 @@ app:
       path: /
       secure: false
       same-site: Lax
-    # 旧 accessToken 允许过期的最大时长（秒），用于 refresh 双校验
-    refresh-access-max-stale-seconds: 600
   # 缓存回源限流：Redis 不可用时限制同时回源 DB 的并发数，超出则 503，保障数据库存活
   cache:
     fallback:

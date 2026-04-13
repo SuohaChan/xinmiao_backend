@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### JMeter Reports ###
+report-folder/
+results.jtl
+jmeter.log

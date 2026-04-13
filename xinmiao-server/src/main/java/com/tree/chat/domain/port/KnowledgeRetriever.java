@@ -13,7 +13,7 @@ public interface KnowledgeRetriever {
     Mono<List<Document>> retrieveDocumentsAsync(String query);
 
     String buildPromptWithRagWithinBudget(String originalQuestion,
-                                          List<Document> docs,
-                                          int ragBudgetTokens,
-                                          TokenCounter tokenCounter);
+            List<Document> docs,
+            int ragBudgetTokens,
+            TokenCounter tokenCounter);
 }
