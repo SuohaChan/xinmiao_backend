@@ -257,7 +257,7 @@ public class NoticeServiceImpl extends ServiceImpl<NoticeMapper, Notice> impleme
         queryWrapper.eq(Notice::getIsPublished, 1);
         queryWrapper.select(
                 Notice::getId, Notice::getTitle, Notice::getIsRequired,
-                Notice::getUpdateTime, Notice::getDesc
+                Notice::getUpdateTime, Notice::getDescription
         );
         return baseMapper.selectList(queryWrapper);
     }

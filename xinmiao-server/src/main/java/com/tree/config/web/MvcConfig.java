@@ -20,7 +20,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.config.annotation.AsyncSupportConfigurer;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurationSupport;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.time.Duration;
 import java.time.format.DateTimeFormatter;
@@ -29,7 +29,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 
 @Slf4j
 @Configuration
-public class MvcConfig extends WebMvcConfigurationSupport {
+public class MvcConfig implements WebMvcConfigurer {
     private final ObjectMapper objectMapper;
     private final JwtAuthInterceptor jwtAuthInterceptor;
     private final CounselorOnlyInterceptor counselorOnlyInterceptor;
@@ -167,7 +167,7 @@ public class MvcConfig extends WebMvcConfigurationSupport {
     // ===================== 消息转换器（项目约定：HTTP JSON 使用 Jackson） =====================
 
     @Override
-    protected void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
+    public void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
         // ByteArray 放首位，避免 /v3/api-docs 被错误处理成 Base64（SpringDoc 已知问题）
         converters.add(0, new ByteArrayHttpMessageConverter());
         MappingJackson2HttpMessageConverter jackson = new MappingJackson2HttpMessageConverter();

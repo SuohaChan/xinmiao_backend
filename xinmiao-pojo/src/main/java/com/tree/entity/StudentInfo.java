@@ -49,11 +49,6 @@ public class StudentInfo implements Serializable {
     private String admissionNumber;
 
     /**
-     * 学院
-     */
-    private String school;
-
-    /**
      * 人脸信息储存路径
      */
     private String face;

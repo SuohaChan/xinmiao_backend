@@ -87,6 +87,7 @@ public class StudentInfoServiceImpl extends ServiceImpl<StudentInfoMapper, Stude
         if (sc != null) {
             dto.setCollegeId(sc.getCollegeId());
             dto.setClassId(sc.getClassId());
+            dto.setSchool(sc.getCollege());
         }
         return dto;
     }

@@ -35,7 +35,7 @@ public class RedisConstants {
     /** 缓存重建锁等待时间（秒），Redisson tryLock 有界等待 */
     public static final long LOCK_CACHE_WAIT_SECONDS = 3L;
     /** CacheClient 互斥锁未抢到时最多重试次数 */
-    public static final int LOCK_CACHE_MUTEX_MAX_RETRIES = 10;
+    public static final int LOCK_CACHE_MUTEX_MAX_RETRIES = 3;
     /** CacheClient 互斥锁重试间隔（毫秒） */
     public static final long LOCK_CACHE_MUTEX_INTERVAL_MS = 50L;
 

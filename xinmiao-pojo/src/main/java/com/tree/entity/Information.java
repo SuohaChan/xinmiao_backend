@@ -46,10 +46,11 @@ public class Information implements Serializable {
     private String title;
 
     /**
-     * 资讯简述
+     * 资讯简述（库列 description；JSON 仍用 desc）
      */
-    @TableField("`desc`")
-    private String desc;
+    @TableField("description")
+    @JsonProperty("desc")
+    private String description;
 
     /**
      * 发布范围（校级、院级、班级）

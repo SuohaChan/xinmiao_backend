@@ -57,10 +57,11 @@ public class Task implements Serializable {
     private String title;
 
     /**
-     * 描述
+     * 描述（库列 description；JSON 仍用 desc）
      */
-    @TableField("`desc`")
-    private String desc;
+    @TableField("description")
+    @JsonProperty("desc")
+    private String description;
 
     /**
      * 发布级别（校级、院级、班级）

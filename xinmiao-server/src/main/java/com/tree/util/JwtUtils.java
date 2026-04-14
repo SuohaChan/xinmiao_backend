@@ -6,6 +6,8 @@ import com.tree.result.ErrorCode;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Date;
 
 /**
@@ -25,12 +28,40 @@ public class JwtUtils {
 
     private final SecretKey secretKey;
     private final StringRedisTemplate redis;
+    /** 签发（HS256 签名 + compact），不含 BCrypt / DB */
+    private final Timer generateTimer;
+    /** 验签 + 过期（JJWT parseSignedClaims），不含 Redis */
+    private final Timer verifyCryptoTimer;
+    /** refresh 路径不经过；登出后校验时 Redis 黑名单 hasKey */
+    private final Timer verifyBlacklistTimer;
 
     public JwtUtils(
             @Value("${jwt.secret}") String secret,
-            StringRedisTemplate redis) {
+            StringRedisTemplate redis,
+            MeterRegistry meterRegistry) {
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.redis = redis;
+        // publishPercentileHistogram + 显式 SLO 桶：导出 Prometheus 的 jwt_token_seconds_bucket，便于 histogram_quantile 算 P95/P99
+        Duration[] sloMs = new Duration[] {
+                Duration.ofMillis(1), Duration.ofMillis(2), Duration.ofMillis(3), Duration.ofMillis(4),
+                Duration.ofMillis(5), Duration.ofMillis(7), Duration.ofMillis(10), Duration.ofMillis(25)
+        };
+        this.generateTimer = Timer.builder("jwt.token")
+                .description("JWT access token: sign (generate) or verify crypto / blacklist")
+                .tag("operation", "generate")
+                .publishPercentileHistogram()
+                .serviceLevelObjectives(sloMs)
+                .register(meterRegistry);
+        this.verifyCryptoTimer = Timer.builder("jwt.token")
+                .tag("operation", "verify_crypto")
+                .publishPercentileHistogram()
+                .serviceLevelObjectives(sloMs)
+                .register(meterRegistry);
+        this.verifyBlacklistTimer = Timer.builder("jwt.token")
+                .tag("operation", "verify_blacklist")
+                .publishPercentileHistogram()
+                .serviceLevelObjectives(sloMs)
+                .register(meterRegistry);
     }
 
     /**
@@ -44,19 +75,21 @@ public class JwtUtils {
      * 生成 JWT，辅导员可带 isAdmin 用于学院/班级管理权限
      */
     public String generateAccessToken(Long userId, String type, long expiresInMillis, Boolean isAdmin) {
-        Date now = new Date();
-        Date exp = new Date(now.getTime() + expiresInMillis);
-        String jti = java.util.UUID.randomUUID().toString().replace("-", "");
-        var builder = Jwts.builder()
-                .subject(String.valueOf(userId))
-                .claim("type", type)
-                .id(jti)
-                .issuedAt(now)
-                .expiration(exp);
-        if (isAdmin != null) {
-            builder.claim("isAdmin", isAdmin);
-        }
-        return builder.signWith(secretKey).compact();
+        return generateTimer.record(() -> {
+            Date now = new Date();
+            Date exp = new Date(now.getTime() + expiresInMillis);
+            String jti = java.util.UUID.randomUUID().toString().replace("-", "");
+            var builder = Jwts.builder()
+                    .subject(String.valueOf(userId))
+                    .claim("type", type)
+                    .id(jti)
+                    .issuedAt(now)
+                    .expiration(exp);
+            if (isAdmin != null) {
+                builder.claim("isAdmin", isAdmin);
+            }
+            return builder.signWith(secretKey).compact();
+        });
     }
 
     /**
@@ -66,12 +99,12 @@ public class JwtUtils {
         if (token == null || token.isBlank())
             return null;
         try {
-            Claims claims = Jwts.parser()
+            Claims claims = verifyCryptoTimer.record(() -> Jwts.parser()
                     .verifyWith(secretKey)
                     .build()
                     .parseSignedClaims(token)
-                    .getPayload();
-            if (isBlacklisted(claims.getId())) {
+                    .getPayload());
+            if (verifyBlacklistTimer.record(() -> isBlacklisted(claims.getId()))) {
                 log.debug("JWT in blacklist");
                 return null;
             }

@@ -15,6 +15,7 @@ public class StudentInfoShowDto {
     private String gender;
     private String idNumber;
     private String admissionNumber;
+    /** 学院名称（来自 {@code tb_student_class.college}，无关联时为 null） */
     private String school;
     private String face;
     private Long credit;
