@@ -36,3 +36,8 @@ build/
 report-folder/
 results.jtl
 jmeter.log
+
+# Ignore JMeter runtime files in load-tests directory
+load-tests/**/*.jtl
+load-tests/**/*.log
+load-tests/**/*.csv
