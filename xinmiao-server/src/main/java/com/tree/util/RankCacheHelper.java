@@ -164,8 +164,8 @@ public class RankCacheHelper {
                     return list;
                 }
             }
-            log.debug("排行榜回源等待超时，回源限流内查 DB key={} lockSuffix={}", key, lockSuffix);
-            // 榜单为展示型能力：锁竞争超时快速失败，避免回源 DB（数据量大）
+            log.debug("排行榜锁等待结束仍无 ZSet，返回空榜（未回源 DB）key={} lockSuffix={}", key, lockSuffix);
+            // 未抢到锁且重试后仍无缓存：直接空榜，避免与持锁方竞态回源放大 DB
             return Collections.emptyList();
         } catch (Exception e) {
             // Redis 基础设施异常：对外体现为服务繁忙（503），避免“空榜”误导；同时不回源 DB 放大故障面

@@ -25,6 +25,21 @@ public interface RankService {
     List<RankDto> getCollegeRank();
 
     /**
+     * 今日排行榜（仅 DB 聚合，不读不写 Redis），用于与 {@link #getTodayRank()} 压测对比。
+     */
+    List<RankDto> getTodayRankFromDatabase();
+
+    /**
+     * 本周排行榜（仅 DB 聚合，不读不写 Redis）。
+     */
+    List<RankDto> getWeekRankFromDatabase();
+
+    /**
+     * 当前学生所在学院学年榜（仅 DB 查询，不读不写 Redis）。
+     */
+    List<RankDto> getCollegeRankFromDatabase();
+
+    /**
      * 将本次加分写入排行榜 Redis（今日/周/学院学年），由完成任务的 Service 在事务提交后调用。
      *
      * @param member     学生 ID（String）

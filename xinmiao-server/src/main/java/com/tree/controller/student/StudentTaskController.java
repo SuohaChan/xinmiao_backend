@@ -59,4 +59,23 @@ public class StudentTaskController {
     public Result getCollegeRank() {
         return Result.ok(rankService.getCollegeRank());
     }
+
+    /** 仅 DB 聚合，不经过 Redis ZSet，用于压测与 {@link #getTodayRank()} 对比 */
+    @GetMapping("/rankings/today/db")
+    @mySystemLog(xxbusinessName = "获取今日排行榜(DB-only)")
+    public Result getTodayRankFromDb() {
+        return Result.ok(rankService.getTodayRankFromDatabase());
+    }
+
+    @GetMapping("/rankings/week/db")
+    @mySystemLog(xxbusinessName = "获取周排行榜(DB-only)")
+    public Result getWeekRankFromDb() {
+        return Result.ok(rankService.getWeekRankFromDatabase());
+    }
+
+    @GetMapping("/rankings/college/db")
+    @mySystemLog(xxbusinessName = "获取学院排行榜(DB-only)")
+    public Result getCollegeRankFromDb() {
+        return Result.ok(rankService.getCollegeRankFromDatabase());
+    }
 }

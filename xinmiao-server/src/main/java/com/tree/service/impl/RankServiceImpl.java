@@ -181,6 +181,64 @@ public class RankServiceImpl implements RankService {
     }
 
     @Override
+    public List<RankDto> getTodayRankFromDatabase() {
+        try {
+            List<RankDto> list = aggregateTodayRankFromFlow();
+            if (list == null || list.isEmpty()) {
+                return Collections.emptyList();
+            }
+            fillRankDtoUserInfo(list);
+            return list;
+        } catch (Exception e) {
+            log.error("获取今日排行榜(DB-only)失败", e);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "获取今日排行榜数据失败");
+        }
+    }
+
+    @Override
+    public List<RankDto> getWeekRankFromDatabase() {
+        try {
+            List<RankDto> list = aggregateWeekRankFromFlow();
+            if (list == null || list.isEmpty()) {
+                return Collections.emptyList();
+            }
+            fillRankDtoUserInfo(list);
+            return list;
+        } catch (Exception e) {
+            log.error("获取周排行榜(DB-only)失败", e);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "获取周排行榜数据失败");
+        }
+    }
+
+    @Override
+    public List<RankDto> getCollegeRankFromDatabase() {
+        try {
+            if (StudentHolder.getStudent() == null) {
+                throw new BusinessException(ErrorCode.UNAUTHORIZED, "未登录");
+            }
+            Long studentId = StudentHolder.getStudent().getId();
+            StudentClass studentClass = studentClassService.searchClassByStudentId(studentId);
+            if (studentClass == null) {
+                throw new BusinessException(ErrorCode.NOT_FOUND, "未找到该学生的班级信息");
+            }
+            String college = studentClass.getCollege();
+            LocalDateTime yearStart = RankKeyUtils.academicYearStart();
+            LocalDateTime endTime = LocalDateTime.now();
+            List<RankDto> list = studentTaskMapper.getCollegeRankByAcademicYear(college, yearStart, endTime);
+            if (list == null || list.isEmpty()) {
+                return Collections.emptyList();
+            }
+            fillRankDtoUserInfo(list);
+            return list;
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("获取学院排行榜(DB-only)失败", e);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "获取学院排行榜数据失败");
+        }
+    }
+
+    @Override
     public void applyRankToRedis(String member, int credit, String todayKey, String weekKey, String collegeKey) {
         String safeCollegeKey = (collegeKey != null && !collegeKey.isEmpty()) ? collegeKey : "";
         List<String> keys = List.of(todayKey, weekKey, safeCollegeKey);
