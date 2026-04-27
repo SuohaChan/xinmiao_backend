@@ -2,6 +2,7 @@ package com.tree.controller.student;
 
 import com.tree.annotation.mySystemLog;
 import com.tree.context.StudentHolder;
+import com.tree.dto.InformationSimpleShowDto;
 import com.tree.exception.BusinessException;
 import com.tree.result.ErrorCode;
 import com.tree.result.Result;
@@ -25,9 +26,9 @@ public class StudentInformationController {
 
     @GetMapping("/my")
     @mySystemLog(xxbusinessName = "当前用户资讯列表")
-    public Result getMyInformations() {
+    public Result< List<InformationSimpleShowDto>> getMyInformations() {
         Long userId = requireStudentId();
-        List<?> list = informationService.getInformationByUserId(userId);
+        List<InformationSimpleShowDto> list = informationService.getInformationByUserId(userId);
         return Result.ok(list);
     }
 

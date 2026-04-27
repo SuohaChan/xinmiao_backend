@@ -103,18 +103,11 @@
             </exclusions>
         </dependency>
 
-        <!-- MyBatis-Plus -->
+        <!-- MyBatis-Plus (已内置 MyBatis,无需单独引入 mybatis 依赖) -->
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
             <version>${mybatis-plus.version}</version>
-        </dependency>
-        
-        <!-- MyBatis：解决 JdbcType 枚举警告 -->
-        <dependency>
-            <groupId>org.mybatis</groupId>
-            <artifactId>mybatis</artifactId>
-            <version>3.5.16</version>
         </dependency>
 
         <!-- ===================== AI 相关依赖 ===================== -->

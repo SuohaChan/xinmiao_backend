@@ -82,12 +82,16 @@
             <stringProp name="JSONPostProcessor.match_numbers">1</stringProp>
             <stringProp name="JSONPostProcessor.defaultValues">NOT_FOUND</stringProp>
           </JSONPostProcessor>
+          <hashTree/>
           <BeanShellPostProcessor guiclass="TestBeanGUI" testclass="BeanShellPostProcessor" testname="Save Token" enabled="true">
+            <stringProp name="filename"></stringProp>
+            <stringProp name="parameters"></stringProp>
             <stringProp name="script">String token = vars.get("localToken");
 if (token != null &amp;&amp; !token.equals("NOT_FOUND")) {
     props.put("accessToken", token);
     log.info("Token updated for task-rank test.");
 }</stringProp>
+            <boolProp name="resetInterpreter">false</boolProp>
           </BeanShellPostProcessor>
           <hashTree/>
         </hashTree>

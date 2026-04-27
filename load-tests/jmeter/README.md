@@ -110,6 +110,7 @@ jmeter -n -t load-tests/jmeter/ai-chat-module/chat-load-test.jmx ^
 
 | 验证目标 | 已有脚本 | 观测与填数 |
 |----------|----------|------------|
+| **Redis 榜 vs 纯 DB 榜（对比延迟）** | `task-rank-module/rank-redis-vs-db-compare.jmx` | 每轮：`/rankings/today|week|college` 再 `/rankings/today/db|week/db|college/db`；HTML **Statistics** 按 Label 对比 `[Redis]` 与 `[DB-only]` 的 Average / 95% / 99% Line |
 | 今日/周/学院榜 + 任务列表 | `task-rank-module/task-rank-load-test.jmx` | 依次请求 `rankings/today`、`week`、`college`、`GET /student/tasks?type=`；**需学生已关联班级/学院**，否则业务返回错误；HTML 按 Label 看各接口 P99 |
 | 完成任务写压测 | 自建或复制 Thread Group | `POST /student/tasks/complete`，JSON `{"taskId":"<真实ID>"}`；幂等需同一 `taskId` 连打两次对照 DB |
 | 幂等/无重复 | — | 结合数据库 `tb_credit_flow` 等校验（见集成测试或 SQL） |
@@ -120,6 +121,14 @@ jmeter -n -t load-tests/jmeter/ai-chat-module/chat-load-test.jmx ^
 jmeter -n -t load-tests/jmeter/task-rank-module/task-rank-load-test.jmx ^
   -Jusername=学号 -Jpassword=密码 -JtaskType=校级 ^
   -l load-tests/jmeter/results/task-rank.jtl -e -o load-tests/jmeter/report/task-rank
+```
+
+**Redis vs DB 排行榜对比**（需后端已提供 `/student/tasks/rankings/*/db` 接口）：
+
+```bash
+jmeter -n -t load-tests/jmeter/task-rank-module/rank-redis-vs-db-compare.jmx ^
+  -JHOST=127.0.0.1 -JPORT=9090 -Jusername=学号 -Jpassword=密码 ^
+  -l load-tests/jmeter/results/rank-redis-vs-db.jtl -e -o load-tests/jmeter/report/rank-redis-vs-db
 ```
 
 ---

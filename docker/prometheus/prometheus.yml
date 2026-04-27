@@ -1,0 +1,17 @@
+# Prometheus 抓取配置（与 docker-compose 中 prometheus 服务配合）
+# 后端需在宿主机运行，且 management 暴露 prometheus（见 application.yml）
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # 宿主机上的 Spring Boot：端口与 server.port / SERVER_PORT 一致（默认 prod 常为 9090）
+  - job_name: xinmiao
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:9090"]
+
+  # Prometheus 自身指标
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
