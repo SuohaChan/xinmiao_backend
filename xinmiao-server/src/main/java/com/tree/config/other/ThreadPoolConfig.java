@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.TaskDecorator;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
@@ -20,6 +21,12 @@ import java.util.concurrent.ThreadPoolExecutor;
  */
 @Configuration
 public class ThreadPoolConfig {
+
+    private final TaskDecorator contextPropagatingTaskDecorator;
+
+    public ThreadPoolConfig(TaskDecorator contextPropagatingTaskDecorator) {
+        this.contextPropagatingTaskDecorator = contextPropagatingTaskDecorator;
+    }
 
     @Value("${app.chat.rag.core-pool-size:20}")
     private int ragCorePoolSize;
@@ -45,6 +52,7 @@ public class ThreadPoolConfig {
         executor.setMaxPoolSize(ragMaxPoolSize);
         executor.setQueueCapacity(ragQueueCapacity);
         executor.setThreadNamePrefix("rag-");
+        executor.setTaskDecorator(contextPropagatingTaskDecorator);
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(60);
         // 快速失败：队列满/线程满时直接拒绝，避免阻塞任务回灌到提交线程导致隔离失效与尾延迟尖刺
@@ -63,6 +71,7 @@ public class ThreadPoolConfig {
         executor.setMaxPoolSize(sseMaxPoolSize);
         executor.setQueueCapacity(sseQueueCapacity);
         executor.setThreadNamePrefix("sse-");
+        executor.setTaskDecorator(contextPropagatingTaskDecorator);
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(60);
         // 快速失败：慢客户端/大量连接导致堆积时直接拒绝，优先保护系统稳定性

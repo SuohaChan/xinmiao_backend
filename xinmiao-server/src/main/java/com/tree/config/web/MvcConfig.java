@@ -7,6 +7,7 @@ import com.tree.interceptor.CounselorOnlyInterceptor;
 import com.tree.interceptor.JwtAuthInterceptor;
 import com.tree.interceptor.StudentOnlyInterceptor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,8 +26,6 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import java.time.Duration;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.concurrent.ThreadPoolExecutor;
-
 @Slf4j
 @Configuration
 public class MvcConfig implements WebMvcConfigurer {
@@ -36,6 +35,7 @@ public class MvcConfig implements WebMvcConfigurer {
     private final StudentOnlyInterceptor studentOnlyInterceptor;
     private final CounselorAdminOnlyInterceptor counselorAdminOnlyInterceptor;
     private final ChatRateLimitInterceptor chatRateLimitInterceptor;
+    private final ThreadPoolTaskExecutor mvcTaskExecutor;
 
     public MvcConfig(
             ObjectMapper objectMapper,
@@ -43,13 +43,15 @@ public class MvcConfig implements WebMvcConfigurer {
             CounselorOnlyInterceptor counselorOnlyInterceptor,
             StudentOnlyInterceptor studentOnlyInterceptor,
             CounselorAdminOnlyInterceptor counselorAdminOnlyInterceptor,
-            ChatRateLimitInterceptor chatRateLimitInterceptor) {
+            ChatRateLimitInterceptor chatRateLimitInterceptor,
+            @Qualifier("mvcTaskExecutor") ThreadPoolTaskExecutor mvcTaskExecutor) {
         this.objectMapper = objectMapper;
         this.jwtAuthInterceptor = jwtAuthInterceptor;
         this.counselorOnlyInterceptor = counselorOnlyInterceptor;
         this.studentOnlyInterceptor = studentOnlyInterceptor;
         this.counselorAdminOnlyInterceptor = counselorAdminOnlyInterceptor;
         this.chatRateLimitInterceptor = chatRateLimitInterceptor;
+        this.mvcTaskExecutor = mvcTaskExecutor;
     }
 
     @Value("${cors.allowed-origins:http://localhost:8000}")
@@ -136,28 +138,9 @@ public class MvcConfig implements WebMvcConfigurer {
         return new RestTemplate();
     }
 
-    // ===================== 异步任务执行器（SSE 流式响应必需） =====================
-    
-    /**
-     * 配置 MVC 异步任务执行器，用于 SSE 流式响应的写出操作
-     * 替代默认的 SimpleAsyncTaskExecutor（不重用线程，不适合生产环境）
-     */
-    @Bean(name = "mvcTaskExecutor")
-    public ThreadPoolTaskExecutor mvcTaskExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(10);           // 核心线程数（根据并发调整）
-        executor.setMaxPoolSize(50);            // 最大线程数
-        executor.setQueueCapacity(200);         // 队列容量
-        executor.setThreadNamePrefix("mvc-async-"); // 线程名前缀
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy()); // 拒绝策略
-        executor.initialize();
-        log.info("[MVC 异步执行器] 初始化完成 | corePoolSize=10, maxPoolSize=50, queueCapacity=200");
-        return executor;
-    }
-    
     @Override
     public void configureAsyncSupport(AsyncSupportConfigurer configurer) {
-        configurer.setTaskExecutor(mvcTaskExecutor());
+        configurer.setTaskExecutor(mvcTaskExecutor);
         configurer.setDefaultTimeout(asyncRequestTimeout.toMillis());
         log.info("[MVC 异步支持] 配置完成 | defaultTimeout={} (spring.mvc.async.request-timeout)",
                 asyncRequestTimeout);
