@@ -15,6 +15,7 @@ import com.tree.entity.Clazz;
 import com.tree.entity.College;
 import com.tree.entity.Student;
 import com.tree.entity.StudentClass;
+import com.tree.entity.StudentInfo;
 import com.tree.entity.StudentTask;
 import com.tree.entity.Task;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,6 +29,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import com.tree.constant.RedisConstants;
 import com.tree.exception.BusinessException;
 import com.tree.mapper.StudentClassMapper;
+import com.tree.mapper.StudentInfoMapper;
 import com.tree.mapper.StudentMapper;
 import com.tree.mapper.StudentTaskMapper;
 import com.tree.mapper.TaskMapper;
@@ -57,6 +59,7 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
     private final StringRedisTemplate stringRedisTemplate;
     private final JwtUtils jwtUtils;
     private final PasswordEncoder passwordEncoder;
+    private final StudentInfoMapper studentInfoMapper;
     private final StudentTaskMapper studentTaskMapper;
     private final StudentClassMapper studentClassMapper;
     private final TaskMapper taskMapper;
@@ -66,6 +69,7 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
     public StudentServiceImpl(StringRedisTemplate stringRedisTemplate,
             JwtUtils jwtUtils,
             PasswordEncoder passwordEncoder,
+            StudentInfoMapper studentInfoMapper,
             StudentClassMapper studentClassMapper,
             StudentTaskMapper studentTaskMapper,
             TaskMapper taskMapper,
@@ -74,6 +78,7 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
         this.stringRedisTemplate = stringRedisTemplate;
         this.jwtUtils = jwtUtils;
         this.passwordEncoder = passwordEncoder;
+        this.studentInfoMapper = studentInfoMapper;
         this.studentClassMapper = studentClassMapper;
         this.studentTaskMapper = studentTaskMapper;
         this.taskMapper = taskMapper;
@@ -119,6 +124,20 @@ public class StudentServiceImpl extends ServiceImpl<StudentMapper, Student> impl
                 throw new BusinessException(ErrorCode.DUPLICATE, "用户名已存在，请更换用户名");
             }
             throw e;
+        }
+
+        // 创建学生扩展信息（原由 DB trigger after_student_insert 生成；改为应用层显式维护，避免环境不一致）
+        StudentInfo studentInfo = new StudentInfo();
+        studentInfo.setId(student.getId());
+        studentInfo.setName("");
+        studentInfo.setGender("");
+        studentInfo.setIdNumber("");
+        studentInfo.setAdmissionNumber("");
+        studentInfo.setFace("");
+        studentInfo.setCredit(0L);
+        int infoInserted = studentInfoMapper.insert(studentInfo);
+        if (infoInserted <= 0) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "学生信息初始化失败");
         }
 
         // 学生班级信息关联（学院/班级名称与 tb_college/tb_class 的 id 保持一致）

@@ -265,15 +265,5 @@ CREATE TABLE `tb_credit_flow` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='积分流水';
 
 DROP TRIGGER IF EXISTS `after_student_insert`;
-DELIMITER ;;
-CREATE TRIGGER `after_student_insert` AFTER INSERT ON `tb_student` FOR EACH ROW
-BEGIN
-  INSERT INTO `tb_student_info` (
-    `id`, `name`, `gender`, `id_number`, `admission_number`, `face`, `credit`, `create_time`, `update_time`
-  ) VALUES (
-    NEW.`id`, '', '', '', '', '', 0, NOW(), NOW()
-  );
-END ;;
-DELIMITER ;
 
 SET FOREIGN_KEY_CHECKS = 1;
