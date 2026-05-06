@@ -12,6 +12,9 @@ spring:
     banner-mode: off
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+  # 与 micrometer context-propagation 配合：在 subscribeOn/publishOn 等切换线程时恢复 Tracing/MDC 等 ThreadLocal
+  reactor:
+    context-propagation: auto
   rabbitmq:
     # 发布可靠性：开启 publisher confirm/return，确保发布端可感知是否到达 broker/是否路由成功
     publisher-confirm-type: correlated
@@ -112,8 +115,9 @@ app:
       # 向量检索参数：可线上调参（不改代码）
       # - retrieval-timeout-seconds：向量库 HTTP 客户端的读取超时（用于 ChromaApi 的 RestClient）
       retrieval-timeout-seconds: 10
-      top-k: 6
-      similarity-threshold: 0.3
+      top-k: 3
+      # 与 query 的相似度下限（0～1，越大越严、无关片段更少但可能漏召回）；0 表示不按相似度过滤
+      similarity-threshold: 0.5
     # SSE 发送专用线程池（阻塞 IO 隔离）
     sse:
       core-pool-size: 50
@@ -200,3 +204,13 @@ management:
     web:
       exposure:
         include: health,info,metrics,prometheus
+
+# 离线 RAG 评测（仅当启用 rag.eval.enabled 时由 RagOfflineEvalRunner 读取；调参只改此处，勿与 Java 写双份）
+rag:
+  eval:
+    file: eval/cases/eval.jsonl
+    out: eval/reports/rag-eval-result.json
+    k: 3
+    split: 0
+    exit: true
+    snippet-max-chars: 0
