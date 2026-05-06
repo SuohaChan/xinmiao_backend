@@ -11,7 +11,6 @@ import lombok.NoArgsConstructor;
  * @author tree
  * @since 2025-04-13 15:26:23
  */
-@SuppressWarnings("serial")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

@@ -4,6 +4,72 @@
 
 **默认环境**：MySQL、Redis 已启动；`xinmiao-server` 使用 `dev`，端口 **`9090`**（见 `application-dev.yml`），URL 形如 `http://127.0.0.1:9090/...`。
 
+---
+
+## 离线 RAG 评测（非 JMeter，命令行怎么输入）
+
+对应代码：`xinmiao-server` → `com.tree.chat.eval.RagOfflineEvalRunner`。  
+这是 **Spring Boot 进程参数**，不是 JMeter；需要先打成可执行 Jar（仓库根目录执行）：
+
+```bash
+mvn -pl xinmiao-server -am package -DskipTests
+```
+
+**一定要在仓库根目录**打开终端（保证默认路径 `eval/cases/eval.jsonl`、`eval/reports/rag-eval-result.json` 相对仓库根有效）。
+
+本机跑 Jar 时请先准备 **`env/dev.env`**：仓库里通常只有 `env/dev.env.example`，需复制一份并填入真实密钥（`copy env\dev.env.example env\dev.env` 或手动复制）。该文件内含 `SPRING_PROFILES_ACTIVE`、`SPRING_AI_OPENAI_API_KEY`、`CHROMA_HOST=http://localhost` 等，与 IDE / dev profile 一致。
+
+**PowerShell（推荐）：** 在**仓库根目录**执行（路径 `eval/...`、`xinmiao-server/target/...` 均相对当前目录）。
+
+```powershell
+# 在仓库根目录，勿写死他人机器上的盘符路径
+Set-Location <你的仓库根目录>
+
+Get-Content .\env\dev.env | ForEach-Object {
+  $line = $_.Trim()
+  if ($line -eq '' -or $line.StartsWith('#')) { return }
+  $i = $line.IndexOf('=')
+  if ($i -lt 1) { return }
+  $k = $line.Substring(0, $i).Trim()
+  $v = $line.Substring($i + 1).Trim()
+  Set-Item -Path "Env:$k" -Value $v
+}
+
+java -jar .\xinmiao-server\target\xinmiao-server-0.0.1-SNAPSHOT.jar --rag.eval.enabled=true
+```
+
+说明：`ForEach-Object` 里的 `return` 表示跳过当前行，继续读下一行，**不是**退出整个脚本。  
+若 `env\dev.env` 不存在，上面 `Get-Content` 会报错；Jar 未打包则 `java -jar` 会找不到文件——需先在同一目录执行 `mvn -pl xinmiao-server -am package -DskipTests`。  
+仅写 `--rag.eval.enabled=true` 时，会使用默认的 `eval/cases/eval.jsonl` 与 `eval/reports/rag-eval-result.json`（见下表）；更稳妥可显式写出路径（见下一节「带可选参数」示例）。
+
+**CMD：** 不支持一键加载 `.env`，请先在 PowerShell 里执行上述 `Get-Content` 段，或在系统环境变量里配置与 `env/dev.env` 相同的键。
+
+**可选参数**（全部接在主类参数后面，**同一个 `java -jar ...` 里用空格分隔**，布尔值用小写 `true`/`false`）：
+
+| 参数 | 含义 | 默认 |
+|------|------|------|
+| `--rag.eval.enabled=true` | 必须，才会注册评测 Runner | — |
+| `--rag.eval.file=...` | 评测集路径（相对**当前工作目录**） | `eval/cases/eval.jsonl` |
+| `--rag.eval.k=3` | Top-k，范围会被限制在 1～50 | `3` |
+| `--rag.eval.out=...` | 输出报告 JSON | `eval/reports/rag-eval-result.json` |
+| `--rag.eval.snippet-max-chars=0` | 报告里每条 `snippet` 最大字符数；`0` 或负数表示**不截断**（与 chunk 全文一致） | `0` |
+| `--rag.eval.split=50` | 拆分成多分片输出时的条数；`0` 表示不拆 | `0` |
+| `--rag.eval.exit=true` | 跑完是否退出 JVM（`false` 则继续常驻，慎用端口占用） | `true` |
+
+**带可选参数**：在加载 `env/dev.env` 之后，同一 `java -jar` 命令末尾追加参数即可，例如：
+
+```powershell
+java -jar .\xinmiao-server\target\xinmiao-server-0.0.1-SNAPSHOT.jar --rag.eval.enabled=true --rag.eval.file=eval/cases/eval.jsonl --rag.eval.k=3 --rag.eval.out=eval/reports/rag-eval-result.json --rag.eval.exit=true
+```
+
+**注意：**
+
+- 会拉起**完整** Spring 上下文（向量库 Chroma、Redis、DB、MQ 等按 profile 配置）；依赖服务需可用。
+- 默认 **`rag.eval.exit=true`**，评测结束进程退出；若本机 **9090** 已有常驻后端，请先停掉再跑，或评测时用 **`SERVER_PORT=9091`** 等环境变量避免端口冲突（与 Spring Boot 惯例一致）。
+- 本机不要用 `env/prod.env` 跑 Jar：`CHROMA_HOST=http://chroma` 仅在 Docker 网络内有效；本地请用 **`env/dev.env`**（`CHROMA_HOST=http://localhost`）。
+
+---
+
 **脚本目录**：
 
 | 目录 | 内容 |

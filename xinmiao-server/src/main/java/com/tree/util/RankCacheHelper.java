@@ -3,7 +3,6 @@ package com.tree.util;
 import com.tree.dto.RankDto;
 import com.tree.exception.BusinessException;
 import com.tree.result.ErrorCode;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -33,7 +32,6 @@ import static com.tree.constant.RedisConstants.RANK_REAL_TOTAL_TTL_DAYS;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class RankCacheHelper {
 
     private static final DefaultRedisScript<Long> RELEASE_SCRIPT;
@@ -45,9 +43,16 @@ public class RankCacheHelper {
         RELEASE_SCRIPT = script;
     }
 
-    @Qualifier("scriptRedisTemplate")
     private final StringRedisTemplate stringRedisTemplate;
     private final DbFallbackLimiter dbFallbackLimiter;
+
+    public RankCacheHelper(
+            @Qualifier("scriptRedisTemplate") StringRedisTemplate stringRedisTemplate,
+            DbFallbackLimiter dbFallbackLimiter
+    ) {
+        this.stringRedisTemplate = stringRedisTemplate;
+        this.dbFallbackLimiter = dbFallbackLimiter;
+    }
 
     private static long withJitter(long time, TimeUnit unit) {
         long jitterRange = Math.max(1, (long) (time * 0.1));
@@ -84,7 +89,8 @@ public class RankCacheHelper {
      * reverseRangeWithScores 已按 score 降序，无需再排序。
      */
     public List<RankDto> getRealRankListFromZSet(String key, int topN) {
-        Set<ZSetOperations.TypedTuple<String>> tuples = stringRedisTemplate.opsForZSet().reverseRangeWithScores(key, 0, topN - 1);
+        Set<ZSetOperations.TypedTuple<String>> tuples =
+                stringRedisTemplate.opsForZSet().reverseRangeWithScores(key, 0, topN - 1);
         if (tuples == null || tuples.isEmpty()) {
             return null;
         }
