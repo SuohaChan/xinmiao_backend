@@ -1,0 +1,23 @@
+# Git / IDE
+.git
+.idea
+*.iml
+.vscode
+
+# 只带上 xinmiao-server 的 fat jar；其它模块 target 不必传入构建上下文
+xinmiao-common/target/
+xinmiao-pojo/target/
+
+# 本地环境与密钥（不应打进镜像）
+.env
+.env.*
+env/*.env
+
+# 评测数据（运行时挂载即可）
+eval/*.json
+eval/*.jsonl
+
+# 杂项
+**/report-folder/
+**/*.jtl
+**/jmeter.log
