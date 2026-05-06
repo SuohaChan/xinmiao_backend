@@ -32,6 +32,27 @@ build/
 ### VS Code ###
 .vscode/
 
+### Local env files ###
+.env
+.env.*
+!eval/.env.example
+
+### eval 运行时产物（LLM 裁判输出）###
+eval/runs/*
+!eval/runs/.gitkeep
+
+### Spring 离线评测报告（本地再生成，体积大）###
+eval/reports/*
+!eval/reports/.gitkeep
+
+### Python ###
+__pycache__/
+*.pyc
+
+### Per-environment env files ###
+env/*.env
+!env/*.env.example
+
 ### JMeter Reports ###
 report-folder/
 results.jtl

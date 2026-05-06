@@ -9,8 +9,8 @@
 | 路径 | 说明 |
 |------|------|
 | `cases/` | 评测用例，JSONL，默认 `eval.jsonl` |
-| `reports/` | Spring 离线报告，默认 `rag-eval-result.json` |
-| `runs/` | `dp.py` 输出（`eval/runs/*` 默认被 `.gitignore` 忽略，仅保留 `.gitkeep`） |
+| `reports/` | Spring 离线报告，默认 `rag-eval-result.json`（`eval/reports/*` 已 `.gitignore`，仅保留 `.gitkeep`） |
+| `runs/` | `dp.py` 输出（`eval/runs/*` 已 `.gitignore`，仅保留 `.gitkeep`） |
 | `tools/` | 语料预处理脚本（手册空行、章节等） |
 | `dp.py` | LLM-as-a-judge 入口 |
 | `.env` / `.env.example` | API 密钥等（`.env` 勿提交；从 example 复制） |

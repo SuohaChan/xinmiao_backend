@@ -8,7 +8,8 @@ import java.util.List;
 
 /**
  * 《学生手册》版式切割：以「连续不少于 5 个空行」为段界（与正文中人工预留的五行空白一致）。
- * 若某段超过 {@link #MAX_STRUCTURAL_SEGMENT_CHARS} 字，再按 {@link ChineseTextSplitter} 做标点优先、带重叠的二次切分（约 600～800 字一块）。
+ * 若某段超过 {@link #MAX_STRUCTURAL_SEGMENT_CHARS} 字，再按 {@link ChineseTextSplitter}
+ * 做标点优先、带重叠的二次切分（约 600～800 字一块）。
  */
 public class StudentHandbookStructuredSplitter extends TextSplitter {
 
@@ -21,8 +22,7 @@ public class StudentHandbookStructuredSplitter extends TextSplitter {
     /**
      * 二次切分：目标块约 750 字、重叠 100 字，尽量在句号等处断开；与「600～800 字左右」一致。
      */
-    private static final ChineseTextSplitter OVERSIZED_SEGMENT_SPLITTER =
-            new ChineseTextSplitter(750, 100, 1);
+    private static final ChineseTextSplitter OVERSIZED_SEGMENT_SPLITTER = new ChineseTextSplitter(750, 100, 1);
 
     @Override
     protected List<String> splitText(String text) {
