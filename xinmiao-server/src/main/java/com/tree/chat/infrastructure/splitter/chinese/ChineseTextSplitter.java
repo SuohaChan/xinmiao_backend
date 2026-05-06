@@ -1,4 +1,4 @@
-package com.tree.chat.infrastructure.splitter;
+package com.tree.chat.infrastructure.splitter.chinese;
 
 import org.springframework.ai.transformer.splitter.TextSplitter;
 
@@ -73,11 +73,9 @@ public class ChineseTextSplitter extends TextSplitter {
         int start = 0;
 
         while (start < text.length()) {
-            // 取 [start, start+chunkSize) 范围的文字
             int end = Math.min(start + chunkSize, text.length());
             String raw = text.substring(start, end);
 
-            // 如果不是最后一段，尝试在中文/英文标点处切断，避免切在句子中间
             if (end < text.length()) {
                 int boundary = findLastPunctuation(raw);
                 if (boundary > 0) {
@@ -90,9 +88,6 @@ public class ChineseTextSplitter extends TextSplitter {
                 chunks.add(trimmed);
             }
 
-            // 关键：下一块的起点 = 当前块长度 - overlap
-            // 这样下一块的开头会重复当前块末尾的 overlapSize 个字符
-            // 最后一段（end 已到文末）不减 overlap，避免多出一个纯重复的尾巴块
             boolean isLast = (start + raw.length()) >= text.length();
             int advance = isLast ? raw.length() : raw.length() - overlapSize;
             if (advance <= 0) {
@@ -105,13 +100,12 @@ public class ChineseTextSplitter extends TextSplitter {
     }
 
     /**
-     * 在文本中查找最后一个句子结束标点的位置。
-     * <p>
-     * 支持的标点：中文（。？！）、英文（.?!）、换行符（\n）。
-     *
-     * @param text 要搜索的文本片段
-     * @return 最后一个标点的字符索引；未找到时返回 -1
+     * 对外暴露纯文本分块结果，供 structured 包内在超长段落上做二次切分。
      */
+    public List<String> splitPlainSegments(String text) {
+        return splitText(text);
+    }
+
     private int findLastPunctuation(String text) {
         int last = -1;
         var matcher = PUNCTUATION.matcher(text);
